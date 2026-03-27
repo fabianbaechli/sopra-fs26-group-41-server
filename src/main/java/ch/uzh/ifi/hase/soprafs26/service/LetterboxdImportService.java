@@ -26,7 +26,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 @Service
-@Transactional
 public class LetterboxdImportService {
     private final UserRepository userRepository;
 
@@ -34,6 +33,7 @@ public class LetterboxdImportService {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public LetterboxdImportResponse importZip(User user, MultipartFile file) throws IOException {
         String ratingsCsv;
         try (InputStream is = file.getInputStream()) {
