@@ -35,11 +35,6 @@ public class LetterboxdImportService {
     }
 
     public LetterboxdImportResponse importZip(User user, MultipartFile file) throws IOException {
-        // TODO:
-        //   1. unzip [x]
-        //   2. import/overwrite current user's Letterboxd data []
-        //   3. compute stats []
-        //   4. return updated user payload []
         String ratingsCsv;
         try (InputStream is = file.getInputStream()) {
             ratingsCsv = findFileContentInZip(is, "ratings.csv", StandardCharsets.UTF_8);
