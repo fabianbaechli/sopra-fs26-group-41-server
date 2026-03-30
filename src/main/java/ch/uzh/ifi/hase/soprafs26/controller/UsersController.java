@@ -18,7 +18,8 @@ public class UsersController {
     @GetMapping("/users/me")
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
-    public UsersGetDTO getOwnProfile(@RequestHeader(value = "token", required=true) String token) {
+    public UsersGetDTO getOwnProfile(@RequestHeader(value = "Authorization", required = true)  String authorizationHeader) {
+        String token = authorizationHeader.replace("Bearer ", "");
         User user = userService.getUserByToken(token);
         return DTOMapper.INSTANCE.convertEntityToUsersGetDTO(user);
     }
