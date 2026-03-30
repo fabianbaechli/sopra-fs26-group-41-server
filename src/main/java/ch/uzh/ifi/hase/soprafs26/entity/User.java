@@ -42,6 +42,8 @@ public class User implements Serializable {
     @Embedded
     private TasteProfile tasteProfile = new TasteProfile();
 
+    private boolean hasLetterboxdData=true;
+
     public Long getId() {
 		return id;
 	}
@@ -83,11 +85,18 @@ public class User implements Serializable {
     }
 
     public TasteProfile getTasteProfile() {
+        this.setHasLetterboxdData(true);
         return tasteProfile;
     }
 
     public void setTasteProfile(TasteProfile tasteProfile) {
         this.tasteProfile = Objects.requireNonNullElseGet(tasteProfile, TasteProfile::new);
+    }
+    public boolean isHasLetterboxdData() {
+        return hasLetterboxdData;
+    }
+    public void setHasLetterboxdData(boolean hasLetterboxdData) {
+        this.hasLetterboxdData = hasLetterboxdData;
     }
 
 }

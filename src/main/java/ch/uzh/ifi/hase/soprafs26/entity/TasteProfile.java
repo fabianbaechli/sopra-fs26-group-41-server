@@ -49,4 +49,10 @@ public class TasteProfile implements Serializable {
 
         return mergedProfile;
     }
+    public int getMoviesLogged() {
+        if (this.ratedMovies == null) {
+            return 0;
+        }
+        return this.ratedMovies.size();
+    }
 }

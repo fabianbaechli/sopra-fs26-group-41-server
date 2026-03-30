@@ -42,14 +42,14 @@ public interface DTOMapper {
 
     @Mapping(source = "id", target = "id")
     @Mapping(source = "username", target = "username")
-    // Taste Overlap is present in Branch S2 but not my current one This code can be used as soon as they merge
-    //@Mapping(source = "hasLetterboxdData", target = "hasLetterboxdData")
+    @Mapping(source = "hasLetterboxdData", target = "hasLetterboxdData")
+    //Will be commented out once we have the weighted graph implemented and are able to calculate it
     //@Mapping(source = "tasteOverlap", target = "tasteOverlap")
-    //@Mapping(source = "moviesLogged", target = "stats.moviesLogged")
-    //@Mapping(source = "highlyRatedMovies", target = "stats.highlyRatedMovies")
-    //@Mapping(source = "topGenres", target = "stats.topGenres")
-    @Mapping(target = "hasLetterboxdData", ignore = true)
     @Mapping(target = "tasteOverlap", ignore = true)
-    @Mapping(target = "stats", ignore = true)
+    @Mapping(source = "tasteProfile.moviesLogged", target = "stats.moviesLogged")
+    @Mapping(source = "tasteProfile.highlyRatedMovies", target = "stats.highlyRatedMovies")
+    //Commented out until we build a class that fetches the data from OMDB without hitting the rate limit
+    //@Mapping(source = "topGenres", target = "stats.topGenres")
+    @Mapping(target = "stats.topGenres", ignore = true)
     UsersGetDTO convertEntityToUsersGetDTO(User user);
 }
