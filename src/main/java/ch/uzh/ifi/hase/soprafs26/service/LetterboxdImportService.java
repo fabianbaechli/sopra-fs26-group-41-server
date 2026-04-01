@@ -61,6 +61,7 @@ public class LetterboxdImportService {
         tasteProfile.setRatedMovies(ratedMovies);
         tasteProfile.setHighlyRatedMovies(highlyRated);
         user.setTasteProfile(tasteProfile);
+        user.setHasLetterboxdData(!ratedMovies.isEmpty());
         User savedUser = userRepository.save(user);
         userRepository.flush();
 

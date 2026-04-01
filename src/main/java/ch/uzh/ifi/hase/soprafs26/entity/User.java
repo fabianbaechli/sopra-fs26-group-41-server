@@ -42,7 +42,7 @@ public class User implements Serializable {
     @Embedded
     private TasteProfile tasteProfile = new TasteProfile();
 
-    private boolean hasLetterboxdData=true;
+    private boolean hasLetterboxdData=false;
 
     public Long getId() {
 		return id;
