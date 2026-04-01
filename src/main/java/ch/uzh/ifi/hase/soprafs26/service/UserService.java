@@ -41,6 +41,7 @@ public class UserService {
 	public User createUser(User newUser) {
 		newUser.setToken(newToken());
 		newUser.setStatus(UserStatus.OFFLINE);
+        newUser.setHasLetterboxdData(false);
         if (newUser.getTasteProfile() == null) {
             newUser.setTasteProfile(null);
         }
