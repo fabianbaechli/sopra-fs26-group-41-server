@@ -35,7 +35,7 @@ public class LetterboxdImportController {
         String token = AuthenticationController.getAuthorizationToken(authorization);
 
         if (!userService.authenticated(token)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You need to be logged in to do this");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You need to be logged in to do this");
         }
         User currentUser = userService.getUserByToken(token);
 

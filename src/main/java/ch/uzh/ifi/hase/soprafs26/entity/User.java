@@ -85,7 +85,6 @@ public class User implements Serializable {
     }
 
     public TasteProfile getTasteProfile() {
-        this.setHasLetterboxdData(true);
         return tasteProfile;
     }
 

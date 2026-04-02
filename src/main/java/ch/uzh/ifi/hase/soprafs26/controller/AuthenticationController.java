@@ -49,7 +49,7 @@ public class AuthenticationController {
         String token = getAuthorizationToken(authorization);
 
         if (!userService.authenticated(token)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You need to be logged in to do this");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You need to be logged in to do this");
         }
         User user = userService.getUserByToken(token);
         userService.updateUserStatus(user, UserStatus.OFFLINE);
