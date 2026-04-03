@@ -44,4 +44,23 @@ public GroupJoinResponseDTO joinGroup(
     
     return response;
 }
+@PostMapping("/groups/{groupId}/leave")
+@ResponseStatus(HttpStatus.OK)
+@ResponseBody
+public GroupLeaveResponseDTO leaveGroup(
+    @PathVariable Long groupId, 
+    @RequestHeader(value = "Authorization", required = true) String token) {
+        
+    // 1. Authenticate user
+    User user = userService.findUserByToken(token); 
+        
+    // 2. Delegate leave logic
+    groupService.leaveGroup(groupId, user);
+        
+    // 3. Return success response
+    GroupLeaveResponseDTO response = new GroupLeaveResponseDTO();
+    response.setMessage("User successfully left the group");
+        
+    return response;
+    }
 }

@@ -45,4 +45,24 @@ public class GroupService {
         // Save and return the updated group
         return groupRepository.save(group);
     }
+    
+    public void leaveGroup(Long groupId, User user) {
+        log.debug("User {} attempting to leave group {}", user.getUsername(), groupId);
+
+        // Fetch group or throw 404 if it doesn't exist
+        Group group = groupRepository.findById(groupId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+
+        // Failure: User is not a member (403 Forbidden)
+        if (group.getMembers() == null || !group.getMembers().contains(user)) {
+            log.warn("User {} tried to leave group {} but is not a member.", user.getUsername(), groupId);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User is not a member of the group");
+        }
+
+        // Remove user and save
+        group.removeMember(user);
+        log.info("User {} successfully left group {}", user.getUsername(), groupId);
+        
+        groupRepository.save(group);
+    }
 }
