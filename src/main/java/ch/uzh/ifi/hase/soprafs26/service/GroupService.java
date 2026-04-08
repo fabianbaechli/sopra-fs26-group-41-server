@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -61,7 +62,20 @@ public class GroupService {
         return groupRepository.save(group);
     }
 
+    public List<Group> getGroupsForUser(User user) {
+        return groupRepository.findByMembersContaining(user);
+    }
+
     private boolean groupNameUnique(String name) {
         return groupRepository.findGroupByGroupName(name) == null;
+    }
+
+    public Group getGroupById(Long id) {
+        return groupRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+    }
+
+    public boolean isMember(Group group, User user) {
+        return group.getMembers() != null && group.getMembers().contains(user);
     }
 }

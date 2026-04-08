@@ -42,7 +42,7 @@ public class Group implements Serializable {
     private String joinToken;
 
     // todo: will change to a canvas object in future => not yet implemented
-    private File profilePicture;
+    private String profilePicture;
     @ManyToOne
     private User owner;
 
@@ -107,11 +107,11 @@ public class Group implements Serializable {
         this.owner = owner;
     }
 
-    public File getProfilePicture() {
+    public String getProfilePicture() {
         return profilePicture;
     }
 
-    public void setProfilePicture(File profilePicture) {
+    public void setProfilePicture(String profilePicture) {
         this.profilePicture = profilePicture;
     }
 }

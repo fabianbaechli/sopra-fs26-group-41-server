@@ -1,15 +1,10 @@
 package ch.uzh.ifi.hase.soprafs26.rest.dto;
 
-import ch.uzh.ifi.hase.soprafs26.entity.User;
-
-import java.io.File;
-
-public class GroupCreateResponseDTO {
+public class GroupSummaryDTO {
     private Long id;
     private String name;
-    private UserGetDTO owner;
     private String groupProfilePicture;
-    private String joinUrl;
+    private Integer memberCount;
 
     public Long getId() {
         return id;
@@ -35,19 +30,11 @@ public class GroupCreateResponseDTO {
         this.groupProfilePicture = groupProfilePicture;
     }
 
-    public String getJoinUrl() {
-        return joinUrl;
+    public Integer getMemberCount() {
+        return memberCount;
     }
 
-    public void setJoinUrl(String joinUrl) {
-        this.joinUrl = joinUrl;
-    }
-
-    public UserGetDTO getOwner() {
-        return owner;
-    }
-
-    public void setOwner(UserGetDTO owner) {
-        this.owner = owner;
+    public void setMemberCount(Integer memberCount) {
+        this.memberCount = memberCount;
     }
 }
