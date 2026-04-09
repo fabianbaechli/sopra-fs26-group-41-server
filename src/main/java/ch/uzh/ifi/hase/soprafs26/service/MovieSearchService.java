@@ -8,6 +8,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,12 +24,14 @@ public class MovieSearchService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     public MovieSearchResponseDTO searchMovies(String query) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl)
+        URI url = UriComponentsBuilder.fromUriString(baseUrl)
                 .queryParam("apikey", apiKey)
                 .queryParam("s", query)
                 .queryParam("type", "movie")
                 .queryParam("r", "json")
-                .toUriString();
+                .build()
+                .encode()
+                .toUri();
 
         OmdbSearchResponseDTO omdbResponse = restTemplate.getForObject(url, OmdbSearchResponseDTO.class);
 
