@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.service;
 
 import ch.uzh.ifi.hase.soprafs26.rest.dto.*;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -10,7 +11,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.entity.RatedMovie;
@@ -227,5 +230,60 @@ public class MovieSearchService {
         }
 
         return null;
+    }
+
+    public Map<String, String> fetchInternalMovieIds(List<String> movieNames) {
+        Map<String, String> movieIdsByName = new LinkedHashMap<>();
+
+        if (movieNames == null || movieNames.isEmpty()) {
+            return movieIdsByName;
+        }
+
+        List<String> sanitizedNames = movieNames.stream()
+                .filter(name -> name != null && !name.trim().isEmpty())
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (sanitizedNames.isEmpty()) {
+            return movieIdsByName;
+        }
+
+        String url = UriComponentsBuilder.fromUriString(recommendationUrl)
+                .path("/movie/search/bulk")
+                .toUriString();
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            String token = getGoogleCloudToken(recommendationUrl);
+            if (token != null) {
+                headers.setBearerAuth(token);
+            }
+
+            BulkCatalogSearchRequestDTO requestPayload = new BulkCatalogSearchRequestDTO(sanitizedNames);
+            HttpEntity<BulkCatalogSearchRequestDTO> requestEntity = new HttpEntity<>(requestPayload, headers);
+
+            ResponseEntity<Map<String, CatalogMovieDTO[]>> responseEntity = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    requestEntity,
+                    new ParameterizedTypeReference<Map<String, CatalogMovieDTO[]>>() {}
+            );
+
+            Map<String, CatalogMovieDTO[]> results = responseEntity.getBody();
+            if (results != null) {
+                for (Map.Entry<String, CatalogMovieDTO[]> entry : results.entrySet()) {
+                    CatalogMovieDTO[] matches = entry.getValue();
+                    if (matches != null && matches.length > 0 && matches[0] != null) {
+                        movieIdsByName.put(entry.getKey(), String.valueOf(matches[0].getId()));
+                    }
+                }
+            }
+        }
+        catch (Exception e) {
+            System.err.println("Failed to fetch internal IDs in bulk: " + e.getMessage());
+        }
+
+        return movieIdsByName;
     }
 }

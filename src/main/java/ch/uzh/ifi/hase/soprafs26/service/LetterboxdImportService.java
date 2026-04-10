@@ -51,13 +51,19 @@ public class LetterboxdImportService {
         List<RatedMovie> validRatedMovies = new ArrayList<>();
 
         // 2. NEW: Second pass to fetch and attach microservice IDs
+        List<String> movieNames = rawParsedMovies.stream()
+                .map(RatedMovie::getName)
+                .toList();
+        java.util.Map<String, String> internalIdsByName = movieSearchService.fetchInternalMovieIds(movieNames);
+
         for (RatedMovie movie : rawParsedMovies) {
-            String internalId = movieSearchService.fetchInternalMovieId(movie.getName());
+            String internalId = internalIdsByName.get(movie.getName());
 
             if (internalId != null) {
                 movie.setMovieId(internalId);
                 validRatedMovies.add(movie);
-            } else {
+            }
+            else {
                 log.warn("Skipping '{}' - no ID found in microservice.", movie.getName());
             }
         }
@@ -140,9 +146,9 @@ public class LetterboxdImportService {
         return index < columns.size() ? columns.get(index) : null;
     }
 
-    private static int parseLetterboxdRating(String ratingValue) {
+    private static float parseLetterboxdRating(String ratingValue) {
         try {
-            return (int) Math.round(Double.parseDouble(ratingValue.trim()));
+            return Float.parseFloat(ratingValue.trim());
         }
         catch (NumberFormatException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

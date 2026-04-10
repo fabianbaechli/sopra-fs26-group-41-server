@@ -134,6 +134,60 @@ def search_movies_by_name():
 
     return jsonify(results)
 
+# 4. Bulk search movies by a list of names
+@app.route('/movie/search/bulk', methods=['POST'])
+def search_movies_bulk():
+    data = request.get_json()
+    
+    # Safely check if data exists and contains our list
+    if not data or 'names' not in data:
+        return jsonify({"error": "Please provide a JSON body with a 'names' array."}), 400
+        
+    search_terms = data.get('names', [])
+    if not search_terms:
+        return jsonify({})
+
+    conn = sqlite3.connect(CATALOG_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    query = """
+            SELECT m.id, m.title, m.year, m.genres
+            FROM movies m
+            JOIN movies_fts fts ON m.id = fts.rowid
+            WHERE movies_fts MATCH ?
+            ORDER BY fts.rank
+            LIMIT 10
+            """
+            
+    results_dict = {}
+
+    for search_term in search_terms:
+        # Re-use your existing parsing logic for each term
+        decoded_term = unquote(search_term)
+        clean_term = re.sub(r'[^\w\s]', ' ', decoded_term)
+        words = clean_term.split()
+        
+        if not words:
+            results_dict[search_term] = []
+            continue
+
+        query_term = ' '.join([f"{word}*" for word in words])
+        
+        try:
+            cursor.execute(query, (query_term,))
+            results_dict[search_term] = [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            app.logger.error(f"FTS Search Error on query '{query_term}': {e}")
+            results_dict[search_term] = []
+
+    conn.close()
+    
+    # Returns a dictionary where keys are the requested movie names 
+    # and values are the list of search results
+    return jsonify(results_dict)
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8081)))
