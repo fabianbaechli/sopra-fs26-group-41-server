@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.io.File;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -35,7 +36,8 @@ public class Group implements Serializable {
     @Embedded
     private TasteProfile groupTasteProfile = new TasteProfile();
 
-    //private fetchedmovie RecommendedMovies;
+    @ElementCollection(fetch = FetchType.EAGER)
+    private List<FetchedMovie> recommendedMovies = new ArrayList<>();
 
     //private Poll Poll;
 
@@ -114,4 +116,9 @@ public class Group implements Serializable {
     public void setProfilePicture(String profilePicture) {
         this.profilePicture = profilePicture;
     }
+
+    public List<FetchedMovie> getRecommendedMovies() {return recommendedMovies;}
+
+    public void setRecommendedMovies(List<FetchedMovie> recommendedMovies) {this.recommendedMovies = recommendedMovies;}
+
 }

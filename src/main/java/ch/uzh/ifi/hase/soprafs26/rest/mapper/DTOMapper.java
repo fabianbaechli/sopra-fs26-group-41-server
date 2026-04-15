@@ -83,4 +83,11 @@ public interface DTOMapper {
     @Mapping(target = "groupProfilePicture", ignore = true)
     @Mapping(target = "members", expression = "java(group.getMembers() == null ? java.util.Collections.emptyList() : group.getMembers().stream().map(ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper.INSTANCE::convertEntityToGroupMemberDTO).toList())")
     GroupDetailsResponseDTO convertEntityToGroupDetailsResponseDTO(Group group);
+
+
+    @Mapping(source = "movieId", target = "movieId")
+    @Mapping(source = "name", target = "title")
+    @Mapping(target = "posterUrl", ignore = true) // Ignore this until you build the poster fetcher
+    @Mapping(target = "groupMatchScore", expression = "java(fetchedMovie.getOverlapScore() != null ? (int) Math.round(fetchedMovie.getOverlapScore() * 100) : 0)")
+    RecommendedMovieDTO convertEntityToRecommendedMovieDTO(ch.uzh.ifi.hase.soprafs26.entity.FetchedMovie fetchedMovie);
 }

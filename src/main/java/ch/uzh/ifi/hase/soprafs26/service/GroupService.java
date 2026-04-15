@@ -1,8 +1,8 @@
 package ch.uzh.ifi.hase.soprafs26.service;
 
-import ch.uzh.ifi.hase.soprafs26.entity.Group;
-import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.entity.*;
 import ch.uzh.ifi.hase.soprafs26.repository.GroupRepository;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.RecommendResponseDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -20,10 +22,12 @@ public class GroupService {
 
     private final Logger log = LoggerFactory.getLogger(GroupService.class);
     private final GroupRepository groupRepository;
+    private final MovieSearchService movieSearchService;
 
     @Autowired
-    public GroupService(GroupRepository groupRepository) {
+    public GroupService(GroupRepository groupRepository, MovieSearchService movieSearchService) {
         this.groupRepository = groupRepository;
+        this.movieSearchService = movieSearchService;
     }
 
     public Group createNewGroup(User user, String name) {
@@ -56,6 +60,11 @@ public class GroupService {
 
         // Add user to the group
         group.addMember(user);
+        List<TasteProfile> tasteProfiles = new ArrayList<>();
+        for (User member : group.getMembers()) {
+            tasteProfiles.add(member.getTasteProfile());
+        }
+        group.setGroupTasteProfile(TasteProfile.MergeTasteProfiles(tasteProfiles)); //  this should work and merge the tasteprofiles there surely is a more efficient way but we ball
         log.info("Successfully added user {} to group {}", user.getUsername(), group.getGroupName());
         
         // Save and return the updated group
@@ -77,5 +86,54 @@ public class GroupService {
 
     public boolean isMember(Group group, User user) {
         return group.getMembers() != null && group.getMembers().contains(user);
+    }
+
+    public List<FetchedMovie> recommendMovies(Group group) {
+        if (group.getMembers() == null || group.getMembers().isEmpty()) {
+            return new ArrayList<>(); //
+        }
+
+        // 1. Gather all TasteProfiles from members
+        List<TasteProfile> memberProfiles = group.getMembers().stream()
+                .map(User::getTasteProfile)
+                .filter(Objects::nonNull)
+                .toList();
+
+        // 2. Merge them to get a master list of all rated movies in the group
+        TasteProfile mergedProfile = TasteProfile.MergeTasteProfiles(memberProfiles);
+
+        // 3. Extract just the internal microservice IDs
+        List<String> watchedIds = mergedProfile.getRatedMovies().stream()
+                .map(RatedMovie::getMovieId) // Assuming RatedMovie inherits/has getMovieId()
+                .filter(id -> id != null && !id.isEmpty())
+                .toList();
+
+        // 4. Call the microservice (e.g., get top 10 movies, 0 offset)
+        List<RecommendResponseDTO> recommendations = movieSearchService.fetchRecommendations(watchedIds, 10, 0);
+
+        // 5. Convert DTOs to FetchedMovie entities
+        List<FetchedMovie> fetchedMovies = new ArrayList<>();
+        for (RecommendResponseDTO rec : recommendations) {
+            FetchedMovie movie = new FetchedMovie();
+            movie.setInternalId(rec.getMovie_id());
+            movie.setName(rec.getTitle() != null ? rec.getTitle() : "Unknown Title");
+
+            movie.setOverlapScore(rec.getOverlap_score());
+
+            fetchedMovies.add(movie);
+        }
+
+        // 6. Save back to the group
+        group.setRecommendedMovies(fetchedMovies);
+        groupRepository.save(group);
+        return  fetchedMovies;
+    }
+    public void checkRecommendedMoviesEligibility(Group group) {
+        boolean isEligible = group.getMembers().stream()
+                .anyMatch(u -> !u.getTasteProfile().getRatedMovies().isEmpty()); // Had to ask Ai to recode this because Java doesn't leave functions with a return:( also i couldn't use return cause it's a void.
+
+        if (!isEligible) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No Members have uploaded a Taste Profile");
+        }
     }
 }

@@ -188,6 +188,121 @@ def search_movies_bulk():
     return jsonify(results_dict)
 
 
+@app.route('/recommend', methods=['POST'])
+def recommend_movies():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON payload"}), 400
+
+    watched_ids = data.get('watched_ids', [])
+    limit = int(data.get('limit', 10))
+    offset = int(data.get('offset', 0))
+    
+    # --- FINE-TUNING VARIABLE ---
+    # Acts as a baseline minimum floor for popularity bias.
+    # 0.00 = Purely dynamic based on user inputs.
+    # 0.05 = A gentle nudge towards mainstream movies, even for obscure inputs.
+    # 0.15 = A heavy baseline preference for popular movies.
+    POPULARITY_SKEW = 0.15 
+    
+    if not watched_ids:
+        return jsonify([])
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        placeholders = ','.join(['?'] * len(watched_ids))
+
+        # --- 1. Dynamic Popularity Bias Calculation ---
+        raw_bias = data.get('popularity_bias')
+        
+        if raw_bias is not None:
+            popularity_bias = float(raw_bias)
+        else:
+            bias_query = f"""
+                SELECT SUM(rating_sum) 
+                FROM connections 
+                WHERE movie_a IN ({placeholders}) OR movie_b IN ({placeholders})
+            """
+            cursor.execute(bias_query, watched_ids * 2)
+            total_input_sum = cursor.fetchone()[0]
+            
+            MAX_AUTO_BIAS = 0.5
+            
+            if total_input_sum:
+                avg_input_sum = total_input_sum / len(watched_ids)
+                calculated_bias = MAX_AUTO_BIAS * (avg_input_sum / (avg_input_sum + 150000000.0))
+                
+                # Add the skew to the calculation, capping it so it doesn't spiral out of control
+                popularity_bias = min(MAX_AUTO_BIAS + POPULARITY_SKEW, calculated_bias + POPULARITY_SKEW)
+            else:
+                # If no data is found, default to the skew
+                popularity_bias = POPULARITY_SKEW
+                
+            app.logger.info(f"Auto-calculated bias: {round(popularity_bias, 4)} (Includes {POPULARITY_SKEW} skew)")
+
+        # --- 2. Calculate Recommendations ---
+        query = f"""
+            SELECT
+                CASE
+                    WHEN movie_a IN ({placeholders}) THEN movie_b
+                    ELSE movie_a
+                END AS candidate_id,
+                (
+                   (
+                       MAX(0.0, MIN(1.0, ((SUM(rating_sum) * 1.0 / SUM(count)) - 20.0) / 80.0))
+                       *
+                       MIN(1.0, SUM(count) * 1.0 / 50.0)
+                   )
+                   + 
+                   (
+                       ? * (SUM(rating_sum) * 1.0 / (SUM(rating_sum) + 150000000.0))
+                   )
+                ) as overlap_score
+            FROM connections
+            WHERE movie_a IN ({placeholders}) OR movie_b IN ({placeholders})
+            GROUP BY candidate_id
+            HAVING candidate_id NOT IN ({placeholders})
+            ORDER BY overlap_score DESC
+            LIMIT ? OFFSET ?
+        """
+        
+        params = watched_ids + [popularity_bias] + watched_ids * 2 + watched_ids + [limit, offset]
+        
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        conn.close()
+
+        if not results:
+            return jsonify([])
+
+        # --- 3. Fetch Titles from the Catalog DB ---
+        rec_ids = [row[0] for row in results]
+        catalog_conn = sqlite3.connect(f"file:{CATALOG_DB_PATH}?mode=ro", uri=True)
+        catalog_cursor = catalog_conn.cursor()
+        
+        id_placeholders = ','.join(['?'] * len(rec_ids))
+        catalog_cursor.execute(f"SELECT id, title FROM movies WHERE id IN ({id_placeholders})", rec_ids)
+        
+        titles_map = {row[0]: row[1] for row in catalog_cursor.fetchall()}
+        catalog_conn.close()
+
+        # --- 4. Build Final Output ---
+        recommendations = [
+            {
+                "movie_id": str(row[0]), 
+                "title": titles_map.get(row[0], "Unknown Title"), 
+                "overlap_score": round(row[1], 4)
+            }
+            for row in results
+        ]
+
+        return jsonify(recommendations)
+
+    except Exception as e:
+        app.logger.error(f"Error calculating recommendations: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8081)))

@@ -10,10 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.entity.RatedMovie;
@@ -285,5 +282,40 @@ public class MovieSearchService {
         }
 
         return movieIdsByName;
+    }
+    public List<RecommendResponseDTO> fetchRecommendations(List<String> watchedIds, int limit, int offset) {
+        if (watchedIds == null || watchedIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String url = recommendationUrl + "/recommend";
+        RecommendRequestDTO requestPayload = new RecommendRequestDTO(watchedIds, limit, offset);
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            String token = getGoogleCloudToken(recommendationUrl);
+            if (token != null) {
+                headers.setBearerAuth(token); // Use the same auth logic as your other methods
+            }
+
+            HttpEntity<RecommendRequestDTO> requestEntity = new HttpEntity<>(requestPayload, headers);
+
+            // Use the class-level restTemplate and exchange() to pass the auth headers
+            ResponseEntity<RecommendResponseDTO[]> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    requestEntity,
+                    RecommendResponseDTO[].class
+            );
+
+            if (response.getBody() != null) {
+                return Arrays.asList(response.getBody());
+            }
+        } catch (Exception e) {
+            // Log the error pragmatically and return empty so the app doesn't crash
+            System.err.println("Failed to fetch recommendations: " + e.getMessage());
+        }
+
+        return new ArrayList<>();
     }
 }
