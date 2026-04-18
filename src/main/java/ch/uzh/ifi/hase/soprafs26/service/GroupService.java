@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.service;
 
 import ch.uzh.ifi.hase.soprafs26.entity.*;
 import ch.uzh.ifi.hase.soprafs26.repository.GroupRepository;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.MovieSearchResponseDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.RecommendResponseDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,9 +117,27 @@ public class GroupService {
         for (RecommendResponseDTO rec : recommendations) {
             FetchedMovie movie = new FetchedMovie();
             movie.setInternalId(rec.getMovie_id());
-            movie.setName(rec.getTitle() != null ? rec.getTitle() : "Unknown Title");
 
+            String title = rec.getTitle() != null ? rec.getTitle() : "Unknown Title";
+            movie.setName(title);
             movie.setOverlapScore(rec.getOverlap_score());
+
+            // --- New OMDB Fetch Logic ---
+            if (!"Unknown Title".equals(title)) {
+                try {
+                    // Search OMDB by title
+                    MovieSearchResponseDTO searchResponse = movieSearchService.searchMovies(title);
+
+                    // If we get results, take the IMDB ID from the first match
+                    if (searchResponse != null && searchResponse.getResults() != null && !searchResponse.getResults().isEmpty()) {
+                        movie.setMovieId(searchResponse.getResults().get(0).getId());
+                        movie.setPosterUrl(searchResponse.getResults().get(0).getPosterUrl());
+                    }
+                } catch (Exception e) {
+                    // Log but don't crash the whole recommendation process if one movie fails
+                    log.warn("Failed to fetch IMDB ID from OMDB for title: {}", title);
+                }
+            }
 
             fetchedMovies.add(movie);
         }
