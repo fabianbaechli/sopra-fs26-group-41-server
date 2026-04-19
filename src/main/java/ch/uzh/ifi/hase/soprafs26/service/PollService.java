@@ -38,7 +38,7 @@ public class PollService {
         try {
             if (group.getRecommendedMovies() == null || group.getRecommendedMovies().isEmpty()) {
                 groupService.checkRecommendedMoviesEligibility(group);
-                groupService.recommendMovies(group);
+                groupService.recommendMovies(group,0); //Temporarily set offset to zero we can start to change this and make it more sensible
             }
 
             pollBroadcastService.broadcastPollStarted(group);

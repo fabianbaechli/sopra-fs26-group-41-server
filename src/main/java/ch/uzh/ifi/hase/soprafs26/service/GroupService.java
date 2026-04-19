@@ -89,7 +89,7 @@ public class GroupService {
         return group.getMembers() != null && group.getMembers().contains(user);
     }
 
-    public List<FetchedMovie> recommendMovies(Group group) {
+    public List<FetchedMovie> recommendMovies(Group group, int offset) {
         if (group.getMembers() == null || group.getMembers().isEmpty()) {
             return new ArrayList<>(); //
         }
@@ -110,7 +110,7 @@ public class GroupService {
                 .toList();
 
         // 4. Call the microservice (e.g., get top 10 movies, 0 offset)
-        List<RecommendResponseDTO> recommendations = movieSearchService.fetchRecommendations(watchedIds, 10, 0);
+        List<RecommendResponseDTO> recommendations = movieSearchService.fetchRecommendations(watchedIds, 10, offset);
 
         // 5. Convert DTOs to FetchedMovie entities
         List<FetchedMovie> fetchedMovies = new ArrayList<>();

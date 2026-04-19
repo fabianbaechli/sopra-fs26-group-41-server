@@ -128,7 +128,7 @@ public class GroupController {
         User user = userService.getUserByToken(token);
 
         Group joinedGroup = groupService.joinGroupByToken(joinToken, user);
-        groupService.recommendMovies(joinedGroup);
+        groupService.recommendMovies(joinedGroup,0); //Offset is at zero when creating a group
 
         GroupJoinResponseDTO response = new GroupJoinResponseDTO();
         response.setGroupUrl(joinedGroup.getJoinToken());
@@ -163,10 +163,10 @@ public class GroupController {
     @ResponseBody
     public GroupRecommendationDTO getGroupRecommendations(
             @PathVariable Long groupId,
-            @RequestHeader(value = "Authorization", required = true) String authorization) {
+            @RequestHeader(value = "Authorization", required = true) String authorization,
+            @RequestHeader(value = "Offset", required = false, defaultValue = "0") int offset) { // <-- Added Header
 
         String token = AuthenticationController.getAuthorizationToken(authorization);
-
 
         if (!userService.authenticated(token)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You need to be logged in to do this");
@@ -183,14 +183,14 @@ public class GroupController {
         // 1. Check if recommendations already exist to save compute
         List<FetchedMovie> fetchedMovies = group.getRecommendedMovies();
 
-        // 2. If they don't exist, calculate them on the fly (Lazy Evaluation)
-        if (fetchedMovies == null || fetchedMovies.isEmpty()) {
+        // 2. Fetch on the fly if cache is empty OR if we are paginating (offset > 0)
+        if (fetchedMovies == null || fetchedMovies.isEmpty() || offset > 0) {
 
             // This throws the required 409 Conflict if no members have data
             groupService.checkRecommendedMoviesEligibility(group);
 
             // Generate the movies and save them to the group database
-            fetchedMovies = groupService.recommendMovies(group);
+            fetchedMovies = groupService.recommendMovies(group, offset); // <-- Pass offset to service
         }
 
         // 3. Map the fetched (or newly generated) entities to DTOs
