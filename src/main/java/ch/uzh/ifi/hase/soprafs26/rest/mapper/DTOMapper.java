@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.rest.mapper;
 
 import ch.uzh.ifi.hase.soprafs26.entity.Group;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.*;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.*;
 import org.mapstruct.*;
 import org.mapstruct.factory.Mappers;
 
@@ -90,4 +91,8 @@ public interface DTOMapper {
     @Mapping(source = "posterUrl", target = "posterUrl") // Ignore this until you build the poster fetcher
     @Mapping(target = "groupMatchScore", expression = "java(fetchedMovie.getOverlapScore() != null ? (int) Math.round(fetchedMovie.getOverlapScore() * 100) : 0)")
     RecommendedMovieDTO convertEntityToRecommendedMovieDTO(ch.uzh.ifi.hase.soprafs26.entity.FetchedMovie fetchedMovie);
+
+    @Mapping(source = "name", target = "title")
+    @Mapping(target = "tasteOverlap", expression = "java(fetchedMovie.getOverlapScore() != null ? (int) Math.round(fetchedMovie.getOverlapScore() * 100) : 0)")
+    PollMovieDTO convertEntityToPollMovieDTO(ch.uzh.ifi.hase.soprafs26.entity.FetchedMovie fetchedMovie);
 }
