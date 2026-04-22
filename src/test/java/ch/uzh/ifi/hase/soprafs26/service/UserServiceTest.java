@@ -69,5 +69,66 @@ public class UserServiceTest {
 		// is thrown
 		assertThrows(ResponseStatusException.class, () -> userService.createUser(testUser));
 	}
+    @Test
+    public void getUsers_success() {
+        Mockito.when(userRepository.findAll()).thenReturn(java.util.List.of(testUser));
+        java.util.List<User> users = userService.getUsers();
+        assertEquals(1, users.size());
+    }
 
+    @Test
+    public void updateUserToken_success() {
+        User updatedUser = userService.updateUserToken(testUser, "new-token");
+        assertEquals("new-token", updatedUser.getToken());
+        Mockito.verify(userRepository, Mockito.times(1)).save(testUser);
+        Mockito.verify(userRepository, Mockito.times(1)).flush();
+    }
+
+    @Test
+    public void updateUserStatus_success() {
+        userService.updateUserStatus(testUser, UserStatus.ONLINE);
+        assertEquals(UserStatus.ONLINE, testUser.getStatus());
+        Mockito.verify(userRepository, Mockito.times(1)).save(testUser);
+        Mockito.verify(userRepository, Mockito.times(1)).flush();
+    }
+
+    @Test
+    public void newToken_isNotNull() {
+        String token = userService.newToken();
+        assertNotNull(token);
+        assertFalse(token.isEmpty());
+    }
+
+    @Test
+    public void authenticated_validTokenOnline_returnsTrue() {
+        testUser.setStatus(UserStatus.ONLINE);
+        Mockito.when(userRepository.findByToken("valid-token")).thenReturn(testUser);
+        assertTrue(userService.authenticated("valid-token"));
+    }
+
+    @Test
+    public void authenticated_invalidToken_returnsFalse() {
+        Mockito.when(userRepository.findByToken("invalid-token")).thenReturn(null);
+        assertFalse(userService.authenticated("invalid-token"));
+    }
+
+    @Test
+    public void getUserById_validId_success() {
+        Mockito.when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(testUser));
+        User found = userService.getUserById(1L);
+        assertEquals(testUser, found);
+    }
+
+    @Test
+    public void getUserById_invalidId_throwsException() {
+        Mockito.when(userRepository.findById(1L)).thenReturn(java.util.Optional.empty());
+        assertThrows(ResponseStatusException.class, () -> userService.getUserById(1L));
+    }
+
+    @Test
+    public void getUserByUsername_success() {
+        Mockito.when(userRepository.findByUsername("testUsername")).thenReturn(testUser);
+        User found = userService.getUserByUsername("testUsername");
+        assertEquals(testUser, found);
+    }
 }
