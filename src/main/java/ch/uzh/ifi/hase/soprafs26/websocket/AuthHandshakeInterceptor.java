@@ -44,7 +44,6 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {
-        // no-op
     }
 
     private String extractToken(ServerHttpRequest request) {

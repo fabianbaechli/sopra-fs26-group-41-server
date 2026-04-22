@@ -30,8 +30,7 @@ public class AppWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        // Optional: handle incoming client JSON here
-        // For now, no-op if you only need server -> client push
+        // Incoming messages handled here in the future
     }
 
     @Override
