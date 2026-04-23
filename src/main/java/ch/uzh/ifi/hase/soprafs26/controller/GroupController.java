@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.controller;
 
 import java.util.List;
 
+import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollDetailsGetDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -221,4 +222,22 @@ public class GroupController {
         User user = userService.getUserByToken(token);
         pollService.startPoll(groupId, user);
     }
+    @GetMapping("/groups/{groupId}/poll")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public PollDetailsGetDTO getPollDetails(
+            @PathVariable Long groupId,
+            @RequestHeader(value = "Authorization", required = true) String authorization) {
+
+        String token = AuthenticationController.getAuthorizationToken(authorization);
+
+        if (!userService.authenticated(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You need to be logged in to do this");
+        }
+
+        User user = userService.getUserByToken(token);
+
+        return pollService.getPollDetails(groupId, user);
+    }
+
 }
