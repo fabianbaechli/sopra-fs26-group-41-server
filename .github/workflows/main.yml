@@ -42,7 +42,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - name: Adding OMDB API
+        run: sed -i "s/OMDB_API_KEY_PLACEHOLDER/${{ secrets.OMDB_API_KEY }}/g" app.yaml
 
       - name: Deploy to App Engine
         id: deploy
@@ -51,6 +54,7 @@ jobs:
           deliverables: app.yaml
           version: v1
           credentials: ${{ secrets.GCP_SERVICE_CREDENTIALS }}
+
 
       - name: Test
         run: curl "${{ steps.deploy.outputs.url }}"

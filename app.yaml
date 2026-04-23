@@ -6,3 +6,4 @@ instance_class: F2
 
 env_variables:
   REMOTE_SERVICE_URL: "https://recommendation-service-522822317054.europe-west6.run.app"
+  OMDB_API_KEY: OMDB_API_KEY_PLACEHOLDER
