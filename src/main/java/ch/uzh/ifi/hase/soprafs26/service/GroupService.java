@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.MovieDetailsResultDTO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -122,16 +123,29 @@ public class GroupService {
             movie.setName(title);
             movie.setOverlapScore(rec.getOverlap_score());
 
-            // --- New OMDB Fetch Logic ---
+            // --- New OMDB Fetch Logic with Fallback ---
             if (!"Unknown Title".equals(title)) {
                 try {
-                    // Search OMDB by title
-                    MovieSearchResponseDTO searchResponse = movieSearchService.searchMovies(title);
+                    // 1. Try exact match first
+                    MovieSearchResponseDTO exactMatch = movieSearchService.searchMovies(title);
 
-                    // If we get results, take the IMDB ID from the first match
-                    if (searchResponse != null && searchResponse.getResults() != null && !searchResponse.getResults().isEmpty()) {
-                        movie.setMovieId(searchResponse.getResults().get(0).getId());
-                        movie.setPosterUrl(searchResponse.getResults().get(0).getPosterUrl());
+                    if (exactMatch != null && exactMatch.getResults() != null && !exactMatch.getResults().isEmpty()) {
+                        movie.setMovieId(exactMatch.getResults().get(0).getId());
+                        movie.setPosterUrl(exactMatch.getResults().get(0).getPosterUrl());
+                    } else {
+                        // 2. Fallback: Sanitize title (remove all non-alphanumeric characters) and try the broad search
+                        // This regex replaces anything that is NOT a letter, number, or space with a space.
+                        // Then it replaces multiple spaces with a single space.
+                        String sanitizedTitle = title.replaceAll("[^a-zA-Z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+
+                        log.debug("Exact match failed for '{}'. Trying fallback with sanitized query: '{}'", title, sanitizedTitle);
+                        MovieSearchResponseDTO searchResponse = movieSearchService.searchMovies(sanitizedTitle);
+
+                        // If we get results from the fallback, take the IMDB ID from the first match
+                        if (searchResponse != null && searchResponse.getResults() != null && !searchResponse.getResults().isEmpty()) {
+                            movie.setMovieId(searchResponse.getResults().get(0).getId());
+                            movie.setPosterUrl(searchResponse.getResults().get(0).getPosterUrl());
+                        }
                     }
                 } catch (Exception e) {
                     // Log but don't crash the whole recommendation process if one movie fails

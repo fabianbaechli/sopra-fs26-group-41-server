@@ -57,9 +57,11 @@ public class MovieSearchService {
     }
 
     public MovieSearchResponseDTO searchMovies(String query) {
+        String sanitizedQuery = query != null ? query.replaceAll("[-–]", " ") : query;
+
         URI url = UriComponentsBuilder.fromUriString(baseUrl)
                 .queryParam("apikey", apiKey)
-                .queryParam("s", query)
+                .queryParam("s", sanitizedQuery)
                 .queryParam("type", "movie")
                 .queryParam("r", "json")
                 .build()
