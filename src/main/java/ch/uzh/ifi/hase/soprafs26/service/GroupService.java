@@ -13,10 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.MovieDetailsResultDTO;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -104,14 +102,17 @@ public class GroupService {
         // 2. Merge them to get a master list of all rated movies in the group
         TasteProfile mergedProfile = TasteProfile.MergeTasteProfiles(memberProfiles);
 
-        // 3. Extract just the internal microservice IDs
-        List<String> watchedIds = mergedProfile.getRatedMovies().stream()
-                .map(RatedMovie::getMovieId) // Assuming RatedMovie inherits/has getMovieId()
-                .filter(id -> id != null && !id.isEmpty())
-                .toList();
 
-        // 4. Call the microservice (e.g., get top 10 movies, 0 offset)
-        List<RecommendResponseDTO> recommendations = movieSearchService.fetchRecommendations(watchedIds, 10, offset);
+        Map<String, Float> watchedRatings = mergedProfile.getRatedMovies().stream()
+                .filter(m -> m.getMovieId() != null && !m.getMovieId().isEmpty())
+                .collect(Collectors.toMap(
+                        RatedMovie::getMovieId,
+                        RatedMovie::getRating,
+                        (existing, replacement) -> existing // Prevents crashes if two users logged the same movie
+                ));
+
+
+        List<RecommendResponseDTO> recommendations = movieSearchService.fetchRecommendations(watchedRatings, 10, offset);
 
         // 5. Convert DTOs to FetchedMovie entities
         List<FetchedMovie> fetchedMovies = new ArrayList<>();

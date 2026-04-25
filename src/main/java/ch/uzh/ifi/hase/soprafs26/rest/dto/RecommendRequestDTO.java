@@ -1,20 +1,21 @@
 package ch.uzh.ifi.hase.soprafs26.rest.dto;
 
 import java.util.List;
+import java.util.Map;
 
 public class RecommendRequestDTO {
-    private List<String> watched_ids;
+    private Map<String,Float> watchedRatings;
     private int limit;
     private int offset;
 
-    public RecommendRequestDTO(List<String> watched_ids, int limit, int offset) {
-        this.watched_ids = watched_ids;
+    public RecommendRequestDTO(Map<String,Float> watchedRatings, int limit, int offset) {
+        this.watchedRatings = watchedRatings;
         this.limit = limit;
         this.offset = offset;
     }
 
-    public List<String> getWatched_ids() { return watched_ids; }
-    public void setWatched_ids(List<String> watched_ids) { this.watched_ids = watched_ids; }
+    public Map<String,Float> getWatchedRatings() { return watchedRatings; }
+    public void setWatchedRatings(Map<String,Float> watchedRatings) { this.watchedRatings = watchedRatings; }
     public int getLimit() { return limit; }
     public void setLimit(int limit) { this.limit = limit; }
     public int getOffset() { return offset; }

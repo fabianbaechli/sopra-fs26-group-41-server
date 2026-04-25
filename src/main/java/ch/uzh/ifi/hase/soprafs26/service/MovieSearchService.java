@@ -141,16 +141,19 @@ public class MovieSearchService {
             return result;
         }
 
-        List<Long> watchedIds = new ArrayList<>();
+        Map<String, Float> watchedRatings = new HashMap<>();
         if (user != null && user.getTasteProfile() != null) {
-            watchedIds = user.getTasteProfile().getRatedMovies().stream()
-                    .map(RatedMovie::getMovieId)
-                    .map(Long::parseLong)
-                    .collect(Collectors.toList());
+            watchedRatings = user.getTasteProfile().getRatedMovies().stream()
+                    .filter(m -> m.getMovieId() != null && !m.getMovieId().isEmpty())
+                    .collect(Collectors.toMap(
+                            RatedMovie::getMovieId,
+                            RatedMovie::getRating,
+                            (existing, replacement) -> existing
+                    ));
         }
 
         try {
-            OverlapRequestDTO requestPayload = new OverlapRequestDTO(watchedIds, internalMovieId);
+            OverlapRequestDTO requestPayload = new OverlapRequestDTO(watchedRatings, internalMovieId);
             String overlapUrl = recommendationUrl + "/calculate-overlap";
 
             HttpHeaders headers = new HttpHeaders();
@@ -334,13 +337,13 @@ public class MovieSearchService {
         return movieIdsByName;
     }
 
-    public List<RecommendResponseDTO> fetchRecommendations(List<String> watchedIds, int limit, int offset) {
-        if (watchedIds == null || watchedIds.isEmpty()) {
+    public List<RecommendResponseDTO> fetchRecommendations(Map<String, Float> watchedRatings, int limit, int offset) {
+        if (watchedRatings == null || watchedRatings.isEmpty()) {
             return new ArrayList<>();
         }
 
         String url = recommendationUrl + "/recommend";
-        RecommendRequestDTO requestPayload = new RecommendRequestDTO(watchedIds, limit, offset);
+        RecommendRequestDTO requestPayload = new RecommendRequestDTO(watchedRatings, limit, offset);
 
         try {
             HttpHeaders headers = new HttpHeaders();

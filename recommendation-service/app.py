@@ -19,56 +19,67 @@ def get_db_connection():
 
 @app.route("/calculate-overlap", methods=["POST"])
 def calculate_overlap():
-  data = request.get_json()
-  watched_ids = data.get("watched_ids", [])
-  target_movie_id = data.get("target_movie_id")
-  app.logger.info(f"Search results for {target_movie_id}")
+    data = request.get_json()
+    # Now expects a dictionary: { "movie_id": rating }
+    watched_ratings = data.get("watchedRatings", data.get("watched_ratings", {}))
+    print(watched_ratings)
+    target_movie_id = data.get("target_movie_id")
+    app.logger.info(f"Search results for {target_movie_id}")
 
-  if not watched_ids or not target_movie_id:
-    return jsonify({"score": 0.0})
+    if not watched_ratings or not target_movie_id:
+        return jsonify({"score": 0.0})
 
-  try:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    app.logger.info(f"Watched: {watched_ids}  Target: {target_movie_id}")
-    placeholders = ",".join(["?"] * len(watched_ids))
-    query = f"""
-            SELECT SUM(rating_sum), SUM(count)
-            FROM connections
-            WHERE (movie_a = ? AND movie_b IN ({placeholders}))
-               OR (movie_b = ? AND movie_a IN ({placeholders}))
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Build the dynamic VALUES clause for the CTE
+        values_placeholders = ", ".join(["(?, ?)"] * len(watched_ratings))
+        cte_params = []
+        for mid, rating in watched_ratings.items():
+            cte_params.extend([str(mid), float(rating)])
+
+        query = f"""
+            WITH user_ratings(movie_id, rating) AS (
+                VALUES {values_placeholders}
+            )
+            SELECT SUM(c.rating_sum * (u.rating / 5.0)), SUM(c.count * (u.rating / 5.0))
+            FROM connections c
+            JOIN user_ratings u ON u.movie_id = c.movie_a OR u.movie_id = c.movie_b
+            WHERE (c.movie_a = ? AND c.movie_b = u.movie_id)
+               OR (c.movie_b = ? AND c.movie_a = u.movie_id)
         """
+        
+        params = cte_params + [target_movie_id, target_movie_id]
+        cursor.execute(query, params)
+        row = cursor.fetchone()
+        
+        adjusted_rating_sum = row[0] if row[0] else 0
+        adjusted_total_count = row[1] if row[1] else 0
 
-    params = [target_movie_id] + watched_ids + [target_movie_id] + watched_ids
-    cursor.execute(query, params)
-    row = cursor.fetchone()
-    rating_sum = row[0] if row[0] else 0
-    total_count = row[1] if row[1] else 0
+        if adjusted_total_count == 0:
+            return jsonify({"target_id": target_movie_id, "overlap_score": 0.0})
 
-    if total_count == 0:
-      return jsonify({"target_id": target_movie_id, "overlap_score": 0.0})
+        avg_combined = adjusted_rating_sum / adjusted_total_count
 
-    avg_combined = rating_sum / total_count
+        MIN_POSSIBLE = 20.0
+        MAX_POSSIBLE = 100.0
 
-    MIN_POSSIBLE = 20.0
-    MAX_POSSIBLE = 100.0
+        raw_score = (avg_combined - MIN_POSSIBLE) / (MAX_POSSIBLE - MIN_POSSIBLE)
+        raw_score = max(0.0, min(1.0, raw_score))
 
-    raw_score = (avg_combined - MIN_POSSIBLE) / (MAX_POSSIBLE - MIN_POSSIBLE)
-    raw_score = max(0.0, min(1.0, raw_score))
+        VIEWS_THRESHOLD = 50.0
+        confidence_factor = min(1.0, adjusted_total_count / VIEWS_THRESHOLD)
 
-    VIEWS_THRESHOLD = 50.0
-    confidence_factor = min(1.0, total_count / VIEWS_THRESHOLD)
+        final_score = raw_score * confidence_factor
+        
+        conn.close()
+        return jsonify(
+            {"target_id": target_movie_id, "overlap_score": round(final_score, 4)}
+        )
 
-    final_score = raw_score * confidence_factor
-    app.logger.info(f"Search results for {target_movie_id}: {final_score}")
-
-    conn.close()
-    return jsonify(
-      {"target_id": target_movie_id, "overlap_score": round(final_score, 4)}
-    )
-
-  except Exception as e:
-    return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # 2. Expose this function via a GET route and return JSON
@@ -207,130 +218,110 @@ def search_movies_bulk():
 
 @app.route("/recommend", methods=["POST"])
 def recommend_movies():
-  print("getting group recommendations")
-  data = request.get_json()
-  if not data:
-    return jsonify({"error": "Invalid JSON payload"}), 400
+    print("getting group recommendations")
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON payload"}), 400
 
-  watched_ids = data.get("watched_ids", [])
-  limit = int(data.get("limit", 10))
-  offset = int(data.get("offset", 0))
+    watched_ratings = data.get("watchedRatings", data.get("watched_ratings", {}))
+    limit = int(data.get("limit", 10))
+    offset = int(data.get("offset", 0))
+    POPULARITY_SKEW = 0.15
 
-  # --- FINE-TUNING VARIABLE ---
-  # Acts as a baseline minimum floor for popularity bias.
-  # 0.00 = Purely dynamic based on user inputs.
-  # 0.05 = A gentle nudge towards mainstream movies, even for obscure inputs.
-  # 0.15 = A heavy baseline preference for popular movies.
-  POPULARITY_SKEW = 0.15
+    if not watched_ratings:
+        return jsonify([])
 
-  if not watched_ids:
-    return jsonify([])
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-  try:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    placeholders = ",".join(["?"] * len(watched_ids))
+        values_placeholders = ", ".join(["(?, ?)"] * len(watched_ratings))
+        cte_params = []
+        for mid, rating in watched_ratings.items():
+            cte_params.extend([str(mid), float(rating)])
 
-    # --- 1. Dynamic Popularity Bias Calculation ---
-    raw_bias = data.get("popularity_bias")
+        cte_sql = f"WITH user_ratings(movie_id, rating) AS ( VALUES {values_placeholders} )"
 
-    if raw_bias is not None:
-      popularity_bias = float(raw_bias)
-    else:
-      bias_query = f"""
-                SELECT SUM(rating_sum)
-                FROM connections
-                WHERE movie_a IN ({placeholders}) OR movie_b IN ({placeholders})
+        # --- 1. Dynamic Popularity Bias Calculation ---
+        raw_bias = data.get("popularity_bias")
+        if raw_bias is not None:
+            popularity_bias = float(raw_bias)
+        else:
+            bias_query = f"""
+                {cte_sql}
+                SELECT SUM(c.rating_sum)
+                FROM connections c
+                JOIN user_ratings u ON u.movie_id = c.movie_a OR u.movie_id = c.movie_b
             """
-      cursor.execute(bias_query, watched_ids * 2)
-      total_input_sum = cursor.fetchone()[0]
+            cursor.execute(bias_query, cte_params)
+            total_input_sum = cursor.fetchone()[0]
 
-      MAX_AUTO_BIAS = 0.5
+            MAX_AUTO_BIAS = 0.5
+            if total_input_sum:
+                avg_input_sum = total_input_sum / len(watched_ratings)
+                calculated_bias = MAX_AUTO_BIAS * (avg_input_sum / (avg_input_sum + 150000000.0))
+                popularity_bias = min(MAX_AUTO_BIAS + POPULARITY_SKEW, calculated_bias + POPULARITY_SKEW)
+            else:
+                popularity_bias = POPULARITY_SKEW
 
-      if total_input_sum:
-        avg_input_sum = total_input_sum / len(watched_ids)
-        calculated_bias = MAX_AUTO_BIAS * (
-          avg_input_sum / (avg_input_sum + 150000000.0)
-        )
-
-        # Add the skew to the calculation, capping it so it doesn't spiral out of control
-        popularity_bias = min(
-          MAX_AUTO_BIAS + POPULARITY_SKEW, calculated_bias + POPULARITY_SKEW
-        )
-      else:
-        # If no data is found, default to the skew
-        popularity_bias = POPULARITY_SKEW
-
-      app.logger.info(
-        f"Auto-calculated bias: {round(popularity_bias, 4)} (Includes {POPULARITY_SKEW} skew)"
-      )
-
-    # --- 2. Calculate Recommendations ---
-    query = f"""
+        # --- 2. Calculate Recommendations ---
+        query = f"""
+            {cte_sql}
             SELECT
-                CASE
-                    WHEN movie_a IN ({placeholders}) THEN movie_b
-                    ELSE movie_a
-                END AS candidate_id,
+                candidate_id,
                 (
-                   (
-                       MAX(0.0, MIN(1.0, ((SUM(rating_sum) * 1.0 / SUM(count)) - 20.0) / 80.0))
-                       *
-                       MIN(1.0, SUM(count) * 1.0 / 50.0)
-                   )
-                   +
-                   (
-                       ? * (SUM(rating_sum) * 1.0 / (SUM(rating_sum) + 150000000.0))
-                   )
+                   MAX(0.0, MIN(1.0, ((SUM(adjusted_rating_sum) * 1.0 / SUM(adjusted_count)) - 20.0) / 80.0))
+                   * MIN(1.0, SUM(adjusted_count) * 1.0 / 50.0)
                 ) as overlap_score
-            FROM connections
-            WHERE movie_a IN ({placeholders}) OR movie_b IN ({placeholders})
+            FROM (
+                SELECT
+                    CASE WHEN c.movie_a = u.movie_id THEN c.movie_b ELSE c.movie_a END AS candidate_id,
+                    c.rating_sum * (u.rating / 5.0) AS adjusted_rating_sum,
+                    c.count * (u.rating / 5.0) AS adjusted_count
+                FROM connections c
+                JOIN user_ratings u ON u.movie_id = c.movie_a OR u.movie_id = c.movie_b
+            )
             GROUP BY candidate_id
-            HAVING candidate_id NOT IN ({placeholders})
-            AND COUNT >= 100
+            HAVING candidate_id NOT IN (SELECT movie_id FROM user_ratings)
+            AND SUM(adjusted_count) >= 500
             ORDER BY overlap_score DESC
             LIMIT ? OFFSET ?
         """
 
-    params = (
-      watched_ids + [popularity_bias] + watched_ids * 2 + watched_ids + [limit, offset]
-    )
+        # Removed popularity_bias from params
+        params = cte_params + [limit, offset] 
+        cursor.execute(query, params)
+        results = cursor.fetchall()
+        conn.close()
 
-    cursor.execute(query, params)
-    results = cursor.fetchall()
-    conn.close()
+        if not results:
+            return jsonify([])
 
-    if not results:
-      return jsonify([])
+        # --- 3. Fetch Titles from the Catalog DB ---
+        rec_ids = [row[0] for row in results]
+        catalog_conn = sqlite3.connect(f"file:{CATALOG_DB_PATH}?mode=ro", uri=True)
+        catalog_cursor = catalog_conn.cursor()
 
-    # --- 3. Fetch Titles from the Catalog DB ---
-    rec_ids = [row[0] for row in results]
-    catalog_conn = sqlite3.connect(f"file:{CATALOG_DB_PATH}?mode=ro", uri=True)
-    catalog_cursor = catalog_conn.cursor()
+        id_placeholders = ",".join(["?"] * len(rec_ids))
+        catalog_cursor.execute(f"SELECT id, title FROM movies WHERE id IN ({id_placeholders})", rec_ids)
 
-    id_placeholders = ",".join(["?"] * len(rec_ids))
-    catalog_cursor.execute(
-      f"SELECT id, title FROM movies WHERE id IN ({id_placeholders})", rec_ids
-    )
+        titles_map = {row[0]: row[1] for row in catalog_cursor.fetchall()}
+        catalog_conn.close()
 
-    titles_map = {row[0]: row[1] for row in catalog_cursor.fetchall()}
-    catalog_conn.close()
+        # --- 4. Build Final Output ---
+        recommendations = [
+            {
+                "movie_id": str(row[0]),
+                "title": titles_map.get(row[0], "Unknown Title"),
+                "overlap_score": round(row[1], 4),
+            }
+            for row in results
+        ]
+        return jsonify(recommendations)
 
-    # --- 4. Build Final Output ---
-    recommendations = [
-      {
-        "movie_id": str(row[0]),
-        "title": titles_map.get(row[0], "Unknown Title"),
-        "overlap_score": round(row[1], 4),
-      }
-      for row in results
-    ]
-    print("returning group recommendations")
-    return jsonify(recommendations)
-
-  except Exception as e:
-    app.logger.error(f"Error calculating recommendations: {e}")
-    return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        app.logger.error(f"Error calculating recommendations: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/user-overlap", methods=["POST"])
 def calculate_user_overlap():
