@@ -4,14 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DrawingStateDTO {
-    // TODO: track actual strokes here. This is just <Object> is just temporary
-    private List<Object> strokes = new ArrayList<>();
+    private List<DrawingStrokeDTO> strokes = new ArrayList<>();
 
-    public List<Object> getStrokes() {
+    public List<DrawingStrokeDTO> getStrokes() {
         return strokes;
     }
 
-    public void setStrokes(List<Object> strokes) {
+    public void setStrokes(List<DrawingStrokeDTO> strokes) {
         this.strokes = strokes;
     }
 }
