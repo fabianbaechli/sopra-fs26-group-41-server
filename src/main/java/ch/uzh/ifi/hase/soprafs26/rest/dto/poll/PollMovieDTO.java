@@ -4,6 +4,7 @@ public class PollMovieDTO {
     private String movieId;
     private String title;
     private String posterUrl;
+    private Integer votes;
 
     public String getMovieId() {
         return movieId;
@@ -28,4 +29,11 @@ public class PollMovieDTO {
     public void setPosterUrl(String posterUrl) {
         this.posterUrl = posterUrl;
     }
+
+    public Integer getVotes() {
+        return votes;
+    }
+
+    public void setVotes(Integer votes) {
+        this.votes = votes;}
 }

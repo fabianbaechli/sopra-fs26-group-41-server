@@ -183,9 +183,15 @@ public class PollService {
         }
 
         long highestScore = interestedCounts.values().stream().mapToLong(Long::longValue).max().orElse(0L);
+
+
         List<PollMovieDTO> winners = pollState.movies.stream()
                 .filter(movie -> interestedCounts.getOrDefault(movie.getMovieId(), 0L) == highestScore)
-                .map(this::copyPollMovie)
+                .map(movie -> {
+                    PollMovieDTO copy = copyPollMovie(movie);
+                    copy.setVotes((int) highestScore); // Set the calculated votes
+                    return copy;
+                })
                 .toList();
 
         pollState.status = "FINISHED";
@@ -241,6 +247,7 @@ public class PollService {
         copy.setMovieId(movie.getMovieId());
         copy.setTitle(movie.getTitle());
         copy.setPosterUrl(movie.getPosterUrl());
+        copy.setVotes(movie.getVotes()); // Make sure votes are transferred
         return copy;
     }
 
