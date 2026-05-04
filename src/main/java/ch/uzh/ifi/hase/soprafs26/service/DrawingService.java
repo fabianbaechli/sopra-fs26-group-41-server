@@ -16,10 +16,13 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 
 @Service
 public class DrawingService {
@@ -29,6 +32,8 @@ public class DrawingService {
     private final ObjectMapper objectMapper;
 
     private final Map<Long, DrawingSession> drawingSessionsByGroupId = new ConcurrentHashMap<>();
+    private final Map<String, DrawingSession> sessionsById = new ConcurrentHashMap<>();
+
 
     public DrawingService(
             GroupService groupService,
@@ -52,6 +57,9 @@ public class DrawingService {
                 ignored -> new DrawingSession(UUID.randomUUID().toString())
         );
 
+        sessionsById.put(session.getSessionId(), session);
+
+
         session.getActiveUsers().put(
                 user.getId(),
                 new ActiveDrawingUserDTO(user.getId(), user.getUsername())
@@ -69,6 +77,113 @@ public class DrawingService {
 
         return response;
     }
+    public void processWebSocketMessage(String username, String payload) {
+        try {
+            StrokeMessageDTO message = objectMapper.readValue(payload, StrokeMessageDTO.class);
+            if ("stroke".equals(message.getType())) {
+                if ("start".equals(message.getEvent())) {
+                    handleStrokeStart(username, message);
+                } else if ("append".equals(message.getEvent())) {
+                    handleStrokeAppend(username, message);
+                } else if ("end".equals(message.getEvent())) {
+                    handleStrokeEnd(username, message);
+                }
+            }
+        } catch (Exception ignored) {
+            // Drop invalid/malformed JSON payloads silently
+        }
+    }
+
+    private void handleStrokeStart(String username, StrokeMessageDTO message) throws Exception {
+        DrawingSession session = sessionsById.get(message.getSessionId());
+        if (session == null) return;
+
+        Long userId = getUserIdByUsername(username, session);
+        if (userId == null) return;
+
+        DrawingStrokeDTO stroke = new DrawingStrokeDTO();
+        stroke.setStrokeId(message.getStrokeId());
+        stroke.setUserId(userId);
+        stroke.setColor(message.getColor());
+        stroke.setWidth(message.getWidth());
+
+        if (message.getPoint() != null) {
+            stroke.getPoints().add(message.getPoint());
+        }
+
+        session.getStrokes().add(stroke);
+
+        Map<String, Object> broadcast = new HashMap<>();
+        broadcast.put("type", "stroke");
+        broadcast.put("event", "started");
+        broadcast.put("sessionId", message.getSessionId());
+
+        Map<String, Object> strokeData = new HashMap<>();
+        strokeData.put("strokeId", message.getStrokeId());
+        strokeData.put("userId", userId);
+        strokeData.put("color", message.getColor());
+        strokeData.put("width", message.getWidth());
+        strokeData.put("point", message.getPoint());
+
+        broadcast.put("stroke", strokeData);
+
+        broadcastToSessionExcept(session, username, objectMapper.writeValueAsString(broadcast));
+    }
+
+    private void handleStrokeAppend(String username, StrokeMessageDTO message) throws Exception {
+        DrawingSession session = sessionsById.get(message.getSessionId());
+        if (session == null) return;
+
+        session.getStrokes().stream()
+                .filter(s -> s.getStrokeId().equals(message.getStrokeId()))
+                .findFirst()
+                .ifPresent(stroke -> {
+                    if (message.getPoints() != null) {
+                        stroke.getPoints().addAll(message.getPoints());
+                    }
+                });
+
+        Map<String, Object> broadcast = new HashMap<>();
+        broadcast.put("type", "stroke");
+        broadcast.put("event", "appended");
+        broadcast.put("sessionId", message.getSessionId());
+        broadcast.put("strokeId", message.getStrokeId());
+        broadcast.put("points", message.getPoints());
+
+        broadcastToSessionExcept(session, username, objectMapper.writeValueAsString(broadcast));
+    }
+
+    private void handleStrokeEnd(String username, StrokeMessageDTO message) throws Exception {
+        DrawingSession session = sessionsById.get(message.getSessionId());
+        if (session == null) return;
+
+        Map<String, Object> broadcast = new HashMap<>();
+        broadcast.put("type", "stroke");
+        broadcast.put("event", "ended");
+        broadcast.put("sessionId", message.getSessionId());
+        broadcast.put("strokeId", message.getStrokeId());
+
+        broadcastToSessionExcept(session, username, objectMapper.writeValueAsString(broadcast));
+    }
+
+    private void broadcastToSessionExcept(DrawingSession session, String excludeUsername, String payload) {
+        for (ActiveDrawingUserDTO activeUser : session.getActiveUsers().values()) {
+            if (!activeUser.getUsername().equals(excludeUsername)) {
+                appWebSocketHandler.sendToUser(activeUser.getUsername(), payload);
+            }
+        }
+    }
+
+    private Long getUserIdByUsername(String username, DrawingSession session) {
+        for (ActiveDrawingUserDTO activeUser : session.getActiveUsers().values()) {
+            if (activeUser.getUsername().equals(username)) {
+                return activeUser.getUserId();
+            }
+        }
+        return null;
+    }
+
+
 
     private DrawingStateDTO buildDrawingState(DrawingSession session) {
         DrawingStateDTO drawingState = new DrawingStateDTO();
@@ -108,6 +223,35 @@ public class DrawingService {
         } catch (Exception ignored) {
         }
     }
+    public static class StrokeMessageDTO {
+        private String type;
+        private String event;
+        private String sessionId;
+        private String strokeId;
+        private String color;
+        private Double width;
+        private List<Double> point;
+        private List<List<Double>> points;
+
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        public String getEvent() { return event; }
+        public void setEvent(String event) { this.event = event; }
+        public String getSessionId() { return sessionId; }
+        public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+        public String getStrokeId() { return strokeId; }
+        public void setStrokeId(String strokeId) { this.strokeId = strokeId; }
+        public String getColor() { return color; }
+        public void setColor(String color) { this.color = color; }
+        public Double getWidth() { return width; }
+        public void setWidth(Double width) { this.width = width; }
+        public List<Double> getPoint() { return point; }
+        public void setPoint(List<Double> point) { this.point = point; }
+        public List<List<Double>> getPoints() { return points; }
+        public void setPoints(List<List<Double>> points) { this.points = points; }
+    }
+
+
 
     private static class DrawingSession {
         private final String sessionId;

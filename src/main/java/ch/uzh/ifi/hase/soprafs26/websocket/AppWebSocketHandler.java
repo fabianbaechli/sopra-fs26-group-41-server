@@ -1,5 +1,7 @@
 package ch.uzh.ifi.hase.soprafs26.websocket;
 
+import ch.uzh.ifi.hase.soprafs26.service.DrawingService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -15,6 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AppWebSocketHandler extends TextWebSocketHandler {
 
     private final Map<String, Set<WebSocketSession>> sessionsByUsername = new ConcurrentHashMap<>();
+    private final DrawingService drawingService;
+
+    public AppWebSocketHandler(@Lazy DrawingService drawingService) {
+        this.drawingService = drawingService;
+    }
+
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -30,7 +38,14 @@ public class AppWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        // Incoming messages handled here in the future
+        if (session.getPrincipal() == null) {
+            return;
+        }
+
+        String username = session.getPrincipal().getName();
+        // Dispatch incoming messages to the DrawingService for business logic routing[cite: 2]
+        drawingService.processWebSocketMessage(username, message.getPayload());
+
     }
 
     @Override
