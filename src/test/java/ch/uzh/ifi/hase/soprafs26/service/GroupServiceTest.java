@@ -152,7 +152,7 @@ public class GroupServiceTest {
         resultDto.setPosterUrl("poster.jpg");
         omdbResp.setResults(List.of(resultDto));
 
-        Mockito.when(movieSearchService.fetchRecommendations(Mockito.anyList(), Mockito.eq(10), Mockito.eq(0)))
+        Mockito.when(movieSearchService.fetchRecommendations(Mockito.anyMap(), Mockito.eq(10), Mockito.eq(0)))
                 .thenReturn(List.of(recDto));
         Mockito.when(movieSearchService.searchMovies("Movie B")).thenReturn(omdbResp);
 

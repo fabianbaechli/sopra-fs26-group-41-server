@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.controller;
 
 import ch.uzh.ifi.hase.soprafs26.entity.TasteProfile;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.service.MovieSearchService;
 import ch.uzh.ifi.hase.soprafs26.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,9 @@ public class UsersControllerTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean
+    private MovieSearchService movieSearchService;
 
     @Test
     public void getOwnProfile_validToken_returns200() throws Exception {

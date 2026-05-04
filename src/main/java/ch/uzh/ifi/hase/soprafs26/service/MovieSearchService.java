@@ -141,16 +141,19 @@ public class MovieSearchService {
             return result;
         }
 
-        List<Long> watchedIds = new ArrayList<>();
+        Map<String, Float> watchedRatings = new HashMap<>();
         if (user != null && user.getTasteProfile() != null) {
-            watchedIds = user.getTasteProfile().getRatedMovies().stream()
-                    .map(RatedMovie::getMovieId)
-                    .map(Long::parseLong)
-                    .collect(Collectors.toList());
+            watchedRatings = user.getTasteProfile().getRatedMovies().stream()
+                    .filter(m -> m.getMovieId() != null && !m.getMovieId().isEmpty())
+                    .collect(Collectors.toMap(
+                            RatedMovie::getMovieId,
+                            RatedMovie::getRating,
+                            (existing, replacement) -> existing
+                    ));
         }
 
         try {
-            OverlapRequestDTO requestPayload = new OverlapRequestDTO(watchedIds, internalMovieId);
+            OverlapRequestDTO requestPayload = new OverlapRequestDTO(watchedRatings, internalMovieId);
             String overlapUrl = recommendationUrl + "/calculate-overlap";
 
             HttpHeaders headers = new HttpHeaders();
@@ -179,6 +182,62 @@ public class MovieSearchService {
         }
 
         return result;
+    }
+    public Integer getUserTasteOverlap(User currentUser, User targetUser) {
+        if (currentUser == null || targetUser == null ||
+                currentUser.getTasteProfile() == null || targetUser.getTasteProfile() == null ||
+                currentUser.getTasteProfile().getRatedMovies() == null ||
+                targetUser.getTasteProfile().getRatedMovies() == null) {
+            return 0;
+        }
+
+        // Map Movie IDs to their actual ratings
+        Map<String, Number> currentUserRatings = currentUser.getTasteProfile().getRatedMovies().stream()
+                .collect(Collectors.toMap(
+                        RatedMovie::getMovieId,
+                        RatedMovie::getRating,
+                        (existing, replacement) -> existing // Pragmatic safeguard against duplicate movie entries
+                ));
+
+        Map<String, Number> targetUserRatings = targetUser.getTasteProfile().getRatedMovies().stream()
+                .collect(Collectors.toMap(
+                        RatedMovie::getMovieId,
+                        RatedMovie::getRating,
+                        (existing, replacement) -> existing
+                ));
+
+        if (currentUserRatings.isEmpty() || targetUserRatings.isEmpty()) {
+            return 0;
+        }
+
+        try {
+            String url = recommendationUrl + "/user-overlap";
+            HttpHeaders headers = new HttpHeaders();
+            String token = getGoogleCloudToken(recommendationUrl);
+            if (token != null) {
+                headers.setBearerAuth(token);
+            }
+
+            // Create payload holding both maps
+            Map<String, Map<String, Number>> requestPayload = new HashMap<>();
+            requestPayload.put("user1_ratings", currentUserRatings);
+            requestPayload.put("user2_ratings", targetUserRatings);
+
+            HttpEntity<Map<String, Map<String, Number>>> requestEntity = new HttpEntity<>(requestPayload, headers);
+
+            ResponseEntity<Map> responseEntity = restTemplate.exchange(
+                    url, HttpMethod.POST, requestEntity, Map.class
+            );
+
+            Map<String, Object> responseBody = responseEntity.getBody();
+            if (responseBody != null && responseBody.containsKey("overlap_score")) {
+                return (Integer) responseBody.get("overlap_score");
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to fetch weighted user taste overlap: " + e.getMessage());
+        }
+
+        return 0;
     }
 
     private Integer parseYear(String yearValue) {
@@ -278,13 +337,13 @@ public class MovieSearchService {
         return movieIdsByName;
     }
 
-    public List<RecommendResponseDTO> fetchRecommendations(List<String> watchedIds, int limit, int offset) {
-        if (watchedIds == null || watchedIds.isEmpty()) {
+    public List<RecommendResponseDTO> fetchRecommendations(Map<String, Float> watchedRatings, int limit, int offset) {
+        if (watchedRatings == null || watchedRatings.isEmpty()) {
             return new ArrayList<>();
         }
 
         String url = recommendationUrl + "/recommend";
-        RecommendRequestDTO requestPayload = new RecommendRequestDTO(watchedIds, limit, offset);
+        RecommendRequestDTO requestPayload = new RecommendRequestDTO(watchedRatings, limit, offset);
 
         try {
             HttpHeaders headers = new HttpHeaders();
