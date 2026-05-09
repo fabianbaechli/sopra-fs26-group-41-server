@@ -1,7 +1,7 @@
 # https://cloud.google.com/appengine/docs/the-appengine-environments#comparing_high-level_features
 # https://cloud.google.com/appengine/docs/standard
 
-runtime: java17
+runtime: java21
 env: flex
 
 env_variables:
