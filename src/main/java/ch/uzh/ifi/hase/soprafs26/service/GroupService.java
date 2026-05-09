@@ -84,6 +84,20 @@ public class GroupService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
     }
 
+    public byte[] getGroupProfilePicture(Long groupId, User user) {
+        Group group = getGroupById(groupId);
+
+        if (!isMember(group, user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group");
+        }
+
+        if (group.getProfilePicture() == null || group.getProfilePicture().length == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Group profile picture not found");
+        }
+
+        return group.getProfilePicture();
+    }
+
     public boolean isMember(Group group, User user) {
         return group.getMembers() != null && group.getMembers().contains(user);
     }

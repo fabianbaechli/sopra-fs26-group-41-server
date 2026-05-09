@@ -43,8 +43,10 @@ public class Group implements Serializable {
 
     private String joinToken;
 
-    // todo: will change to a canvas object in future => not yet implemented
-    private String profilePicture;
+    // tells hibernate to store profile_picture as a large object
+    @Lob
+    private byte[] profilePicture;
+
     @ManyToOne
     private User owner;
 
@@ -109,11 +111,11 @@ public class Group implements Serializable {
         this.owner = owner;
     }
 
-    public String getProfilePicture() {
+    public byte[] getProfilePicture() {
         return profilePicture;
     }
 
-    public void setProfilePicture(String profilePicture) {
+    public void setProfilePicture(byte[] profilePicture) {
         this.profilePicture = profilePicture;
     }
 
