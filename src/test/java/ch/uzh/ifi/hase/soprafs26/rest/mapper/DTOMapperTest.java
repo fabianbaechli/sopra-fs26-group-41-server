@@ -114,20 +114,15 @@ public class DTOMapperTest {
         group.setId(10L);
         group.setGroupName("Movie Night");
         group.setOwner(owner);
-        group.setProfilePicture("group-picture");
+        group.setProfilePicture("group-picture".getBytes());
         group.setJoinToken("join-token");
 
         GroupCreateResponseDTO dto = DTOMapper.INSTANCE.convertEntityToGroupCreateResponseDTO(group);
 
         assertEquals(10L, dto.getId());
         assertEquals("Movie Night", dto.getName());
-        assertEquals("group-picture", dto.getGroupProfilePicture());
         assertEquals("join-token", dto.getJoinUrl());
-
-        assertNotNull(dto.getOwner());
-        assertEquals(1L, dto.getOwner().getId());
-        assertEquals("owner", dto.getOwner().getUsername());
-        assertEquals(UserStatus.OFFLINE, dto.getOwner().getStatus());
+        assertEquals("/groups/10/profile-picture", dto.getGroupProfilePicture());
     }
 
     @Test

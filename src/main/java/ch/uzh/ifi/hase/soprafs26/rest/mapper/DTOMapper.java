@@ -63,13 +63,13 @@ public interface DTOMapper {
     @Mapping(source = "id", target = "id")
     @Mapping(source = "groupName", target = "name")
     @Mapping(source = "owner", target = "owner")
-    @Mapping(source = "profilePicture", target = "groupProfilePicture")
     @Mapping(source = "joinToken", target = "joinUrl")
+    @Mapping(target = "groupProfilePicture", expression = "java(profilePictureUrlForGroup(group))")
     GroupCreateResponseDTO convertEntityToGroupCreateResponseDTO(Group group);
 
     @Mapping(source = "id", target = "id")
     @Mapping(source = "groupName", target = "name")
-    @Mapping(target = "groupProfilePicture", ignore = true)
+    @Mapping(target = "groupProfilePicture", expression = "java(profilePictureUrlForGroup(group))")
     @Mapping(target = "memberCount", expression = "java(group.getMembers() == null ? 0 : group.getMembers().size())")
     GroupSummaryDTO convertEntityToGroupSummaryDTO(Group group);
 
@@ -81,9 +81,17 @@ public interface DTOMapper {
     @Mapping(source = "groupName", target = "name")
     @Mapping(target = "ownerId", expression = "java(group.getOwner() == null ? null : group.getOwner().getId())")
     @Mapping(source = "joinToken", target = "joinUrl")
-    @Mapping(target = "groupProfilePicture", ignore = true)
+    @Mapping(target = "groupProfilePicture", expression = "java(profilePictureUrlForGroup(group))")
     @Mapping(target = "members", expression = "java(group.getMembers() == null ? java.util.Collections.emptyList() : group.getMembers().stream().map(ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper.INSTANCE::convertEntityToGroupMemberDTO).toList())")
     GroupDetailsResponseDTO convertEntityToGroupDetailsResponseDTO(Group group);
+
+    default String profilePictureUrlForGroup(Group group) {
+        if (group == null || group.getId() == null || group.getProfilePicture() == null || group.getProfilePicture().length == 0) {
+            return null;
+        }
+
+        return "/groups/" + group.getId() + "/profile-picture";
+    }
 
 
     @Mapping(source = "movieId", target = "movieId")
