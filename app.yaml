@@ -1,11 +1,10 @@
-# https://cloud.google.com/appengine/docs/the-appengine-environments#comparing_high-level_features
-# https://cloud.google.com/appengine/docs/standard
-
 runtime: java
 env: flex
 
 runtime_config:
   operating_system: ubuntu22
+  runtime_version: "21"
+
 
 env_variables:
   REMOTE_SERVICE_URL: "https://recommendation-service-522822317054.europe-west6.run.app"
