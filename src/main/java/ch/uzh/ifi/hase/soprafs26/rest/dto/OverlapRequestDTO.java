@@ -1,18 +1,19 @@
 package ch.uzh.ifi.hase.soprafs26.rest.dto;
 import java.util.List;
+import java.util.Map;
 
 public class OverlapRequestDTO {
-    private List<Long> watched_ids;
+    private Map<String,Float> watchedRatings;
     private String target_movie_id;
 
 
-    public OverlapRequestDTO(List<Long> watched_ids, String target_movie_id) {
-        this.watched_ids = watched_ids;
+    public OverlapRequestDTO(Map<String,Float> watchedRatings, String target_movie_id) {
+        this.watchedRatings = watchedRatings;
         this.target_movie_id = target_movie_id;
     }
 
-    public List<Long> getWatched_ids() { return watched_ids; }
-    public void setWatched_ids(List<Long> watched_ids) { this.watched_ids = watched_ids; }
+    public Map<String,Float> getWatchedRatings() { return watchedRatings; }
+    public void setWatchedRatings(Map<String,Float> watchedRatings) { this.watchedRatings = watchedRatings; }
 
     public String getTarget_movie_id() { return target_movie_id; }
     public void setTarget_movie_id(String target_movie_id) { this.target_movie_id = target_movie_id; }

@@ -3,6 +3,7 @@ package ch.uzh.ifi.hase.soprafs26.controller;
 import ch.uzh.ifi.hase.soprafs26.entity.TasteProfile;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.UsersGetDTO;
+import ch.uzh.ifi.hase.soprafs26.service.MovieSearchService;
 import ch.uzh.ifi.hase.soprafs26.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,11 +17,12 @@ public class UsersControllerUnitTest {
 
     private UserService userService;
     private UsersController usersController;
+    private MovieSearchService movieSearchService;
 
     @BeforeEach
     public void setup() {
         userService = Mockito.mock(UserService.class);
-        usersController = new UsersController(userService);
+        usersController = new UsersController(userService, movieSearchService);
     }
 
     @Test

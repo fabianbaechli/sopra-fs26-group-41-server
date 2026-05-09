@@ -16,6 +16,8 @@ public class RatedMovie implements Serializable {
 
     @Column(name = "movie_rating", nullable = false)
     private float rating;
+    @Column(name = "movie_year")
+    private Integer year;
 
     public String getMovieId() {return movieId;}
 
@@ -37,5 +39,8 @@ public class RatedMovie implements Serializable {
         this.rating = rating;
     }
 
+    public Integer getYear() {return year;}
+
+    public void setYear(Integer year) {this.year = year;}
 
 }

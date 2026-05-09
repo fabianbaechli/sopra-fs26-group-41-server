@@ -11,11 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.MovieDetailsResultDTO;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -103,14 +102,17 @@ public class GroupService {
         // 2. Merge them to get a master list of all rated movies in the group
         TasteProfile mergedProfile = TasteProfile.MergeTasteProfiles(memberProfiles);
 
-        // 3. Extract just the internal microservice IDs
-        List<String> watchedIds = mergedProfile.getRatedMovies().stream()
-                .map(RatedMovie::getMovieId) // Assuming RatedMovie inherits/has getMovieId()
-                .filter(id -> id != null && !id.isEmpty())
-                .toList();
 
-        // 4. Call the microservice (e.g., get top 10 movies, 0 offset)
-        List<RecommendResponseDTO> recommendations = movieSearchService.fetchRecommendations(watchedIds, 10, offset);
+        Map<String, Float> watchedRatings = mergedProfile.getRatedMovies().stream()
+                .filter(m -> m.getMovieId() != null && !m.getMovieId().isEmpty())
+                .collect(Collectors.toMap(
+                        RatedMovie::getMovieId,
+                        RatedMovie::getRating,
+                        (existing, replacement) -> existing // Prevents crashes if two users logged the same movie
+                ));
+
+
+        List<RecommendResponseDTO> recommendations = movieSearchService.fetchRecommendations(watchedRatings, 10, offset);
 
         // 5. Convert DTOs to FetchedMovie entities
         List<FetchedMovie> fetchedMovies = new ArrayList<>();
@@ -122,16 +124,29 @@ public class GroupService {
             movie.setName(title);
             movie.setOverlapScore(rec.getOverlap_score());
 
-            // --- New OMDB Fetch Logic ---
+            // --- New OMDB Fetch Logic with Fallback ---
             if (!"Unknown Title".equals(title)) {
                 try {
-                    // Search OMDB by title
-                    MovieSearchResponseDTO searchResponse = movieSearchService.searchMovies(title);
+                    // 1. Try exact match first
+                    MovieSearchResponseDTO exactMatch = movieSearchService.searchMovies(title);
 
-                    // If we get results, take the IMDB ID from the first match
-                    if (searchResponse != null && searchResponse.getResults() != null && !searchResponse.getResults().isEmpty()) {
-                        movie.setMovieId(searchResponse.getResults().get(0).getId());
-                        movie.setPosterUrl(searchResponse.getResults().get(0).getPosterUrl());
+                    if (exactMatch != null && exactMatch.getResults() != null && !exactMatch.getResults().isEmpty()) {
+                        movie.setMovieId(exactMatch.getResults().get(0).getId());
+                        movie.setPosterUrl(exactMatch.getResults().get(0).getPosterUrl());
+                    } else {
+                        // 2. Fallback: Sanitize title (remove all non-alphanumeric characters) and try the broad search
+                        // This regex replaces anything that is NOT a letter, number, or space with a space.
+                        // Then it replaces multiple spaces with a single space.
+                        String sanitizedTitle = title.replaceAll("[^a-zA-Z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
+
+                        log.debug("Exact match failed for '{}'. Trying fallback with sanitized query: '{}'", title, sanitizedTitle);
+                        MovieSearchResponseDTO searchResponse = movieSearchService.searchMovies(sanitizedTitle);
+
+                        // If we get results from the fallback, take the IMDB ID from the first match
+                        if (searchResponse != null && searchResponse.getResults() != null && !searchResponse.getResults().isEmpty()) {
+                            movie.setMovieId(searchResponse.getResults().get(0).getId());
+                            movie.setPosterUrl(searchResponse.getResults().get(0).getPosterUrl());
+                        }
                     }
                 } catch (Exception e) {
                     // Log but don't crash the whole recommendation process if one movie fails

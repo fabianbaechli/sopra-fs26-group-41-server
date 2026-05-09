@@ -51,10 +51,8 @@ public class LetterboxdImportService {
         List<RatedMovie> validRatedMovies = new ArrayList<>();
 
         // 2. NEW: Second pass to fetch and attach microservice IDs
-        List<String> movieNames = rawParsedMovies.stream()
-                .map(RatedMovie::getName)
-                .toList();
-        java.util.Map<String, String> internalIdsByName = movieSearchService.fetchInternalMovieIds(movieNames);
+        java.util.Map<String, String> internalIdsByName = movieSearchService.fetchInternalMovieIds(rawParsedMovies);
+
 
         for (RatedMovie movie : rawParsedMovies) {
             String internalId = internalIdsByName.get(movie.getName());
@@ -107,6 +105,7 @@ public class LetterboxdImportService {
             List<String> headers = parseCsvLine(headerLine);
             int nameIndex = findRequiredColumnIndex(headers, "Name");
             int ratingIndex = findRequiredColumnIndex(headers, "Rating");
+            int yearIndex = findRequiredColumnIndex(headers, "Year");
 
             List<RatedMovie> ratedMovies = new ArrayList<>();
             String line;
@@ -118,6 +117,7 @@ public class LetterboxdImportService {
                 List<String> columns = parseCsvLine(line);
                 String movieName = getColumnValue(columns, nameIndex);
                 String ratingValue = getColumnValue(columns, ratingIndex);
+                String yearValue = getColumnValue(columns, yearIndex);
 
                 if (movieName == null || movieName.isBlank() || ratingValue == null || ratingValue.isBlank()) {
                     continue;
@@ -126,6 +126,7 @@ public class LetterboxdImportService {
                 RatedMovie ratedMovie = new RatedMovie();
                 ratedMovie.setName(movieName.trim());
                 ratedMovie.setRating(parseLetterboxdRating(ratingValue));
+                ratedMovie.setYear(Integer.parseInt(yearValue));
                 ratedMovies.add(ratedMovie);
             }
             return ratedMovies;

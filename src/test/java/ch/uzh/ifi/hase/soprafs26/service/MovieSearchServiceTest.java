@@ -109,7 +109,7 @@ public class MovieSearchServiceTest {
     @Test
     public void fetchRecommendations_nullOrEmptyList_returnsEmptyList() {
         assertTrue(movieSearchService.fetchRecommendations(null, 10, 0).isEmpty());
-        assertTrue(movieSearchService.fetchRecommendations(List.of(), 10, 0).isEmpty());
+        assertTrue(movieSearchService.fetchRecommendations(java.util.Collections.emptyMap(), 10, 0).isEmpty());
     }
 
     @Test

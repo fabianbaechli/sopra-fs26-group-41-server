@@ -213,7 +213,7 @@ class GroupControllerTest {
     }
 
     @Test
-    void startPoll_validToken_returns204() throws Exception {
+    void startPoll_validToken_returns201() throws Exception {
         User user = new User();
         user.setId(1L);
         user.setUsername("alice");
@@ -223,7 +223,7 @@ class GroupControllerTest {
 
         mockMvc.perform(post("/groups/10/poll")
                         .header("Authorization", "Bearer valid-token"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isCreated());
 
         verify(pollService, times(1)).startPoll(10L, user);
     }

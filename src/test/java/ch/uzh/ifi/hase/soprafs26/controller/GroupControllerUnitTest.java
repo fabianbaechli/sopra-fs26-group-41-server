@@ -6,6 +6,7 @@ import ch.uzh.ifi.hase.soprafs26.entity.User;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupCreatePostDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupCreateResponseDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupRecommendationDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollStartResponseDTO;
 import ch.uzh.ifi.hase.soprafs26.service.GroupService;
 import ch.uzh.ifi.hase.soprafs26.service.PollService;
 import ch.uzh.ifi.hase.soprafs26.service.UserService;
@@ -148,11 +149,18 @@ public class GroupControllerUnitTest {
         user.setId(1L);
         user.setUsername("alice");
 
+        PollStartResponseDTO pollStartResponseDTO = new PollStartResponseDTO();
+        pollStartResponseDTO.setGroupId(10L);
+        pollStartResponseDTO.setStatus("OPEN");
+
         when(userService.authenticated("valid-token")).thenReturn(true);
         when(userService.getUserByToken("valid-token")).thenReturn(user);
+        when(pollService.startPoll(10L, user)).thenReturn(pollStartResponseDTO);
 
-        groupController.startPoll(10L, authorization);
+        PollStartResponseDTO response = groupController.startPoll(10L, authorization);
 
+        assertEquals(10L, response.getGroupId());
+        assertEquals("OPEN", response.getStatus());
         verify(userService, times(1)).authenticated("valid-token");
         verify(userService, times(1)).getUserByToken("valid-token");
         verify(pollService, times(1)).startPoll(10L, user);
