@@ -10,5 +10,5 @@ env_variables:
   REMOTE_SERVICE_URL: "https://recommendation-service-522822317054.europe-west6.run.app"
   OMDB_API_KEY: OMDB_API_KEY_PLACEHOLDER
 
-  manual_scaling:
-    instances: 1
+manual_scaling:
+  instances: 1
