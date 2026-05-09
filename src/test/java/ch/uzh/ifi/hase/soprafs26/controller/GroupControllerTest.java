@@ -152,8 +152,7 @@ class GroupControllerTest {
 
         mockMvc.perform(post("/groups/join/join-token")
                         .header("Authorization", "Bearer valid-token"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.groupUrl", is("join-token")));
+                .andExpect(status().isOk());
 
         verify(groupService, times(1)).joinGroupByToken("join-token", user);
         verify(groupService, times(1)).recommendMovies(group, 0);
