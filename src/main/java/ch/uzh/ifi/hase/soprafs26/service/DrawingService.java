@@ -292,17 +292,21 @@ public class DrawingService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group");
         }
 
+        byte[] imageBytes;
         String base64Image;
         try {
-            // Convert file to Base64 data URI for easy frontend consumption and database storage
+            // Extract raw bytes for the database
+            imageBytes = image.getBytes();
+
+            // Convert to Base64 data URI for the immediate POST response
             base64Image = "data:" + image.getContentType() + ";base64," +
-                    Base64.getEncoder().encodeToString(image.getBytes());
+                    Base64.getEncoder().encodeToString(imageBytes);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to process image");
         }
 
-        // Persist to database
-        groupService.updateProfilePicture(groupId, base64Image);
+        // Persist raw bytes to database
+        groupService.updateProfilePicture(groupId, imageBytes);
 
         // Broadcast session closure so clients can close their canvas
         Map<String, Object> broadcast = new HashMap<>();
@@ -314,7 +318,7 @@ public class DrawingService {
                 appWebSocketHandler.sendToUser(activeUser.getUsername(), payload);
             }
         } catch (Exception ignored) {
-            // Ignore JSON stringify errors (yolo)
+            // Ignore JSON stringify errors
         }
 
         // Destroy the session

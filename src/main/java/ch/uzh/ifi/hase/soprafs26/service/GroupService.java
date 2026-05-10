@@ -204,9 +204,9 @@ public class GroupService {
 
         groupRepository.save(group);
     }
-    public void updateProfilePicture(Long groupId, String base64Image) {
+    public void updateProfilePicture(Long groupId, byte[] imageBytes) {
         Group group = getGroupById(groupId);
-        group.setProfilePicture(base64Image);
+        group.setProfilePicture(imageBytes);
         groupRepository.save(group);
     }
 }
