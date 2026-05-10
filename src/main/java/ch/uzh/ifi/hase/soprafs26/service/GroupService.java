@@ -145,26 +145,44 @@ public class GroupService {
                     MovieSearchResponseDTO exactMatch = movieSearchService.searchMovies(title);
 
                     if (exactMatch != null && exactMatch.getResults() != null && !exactMatch.getResults().isEmpty()) {
-                        movie.setMovieId(exactMatch.getResults().get(0).getId());
-                        movie.setPosterUrl(exactMatch.getResults().get(0).getPosterUrl());
+
+                        // Find the result that requires the fewest edits to match your target title
+                        var bestMatch = exactMatch.getResults().stream()
+                                .filter(r -> r.getTitle() != null)
+                                .min(Comparator.comparingInt(r -> calculateDistance(title, r.getTitle())))
+                                // Fallback to the first item if something goes wrong
+                                .orElse(exactMatch.getResults().get(0));
+
+                        movie.setMovieId(bestMatch.getId());
+                        movie.setPosterUrl(bestMatch.getPosterUrl());
+
                     } else {
                         // 2. Fallback: Sanitize title (remove all non-alphanumeric characters) and try the broad search
                         // This regex replaces anything that is NOT a letter, number, or space with a space.
                         // Then it replaces multiple spaces with a single space.
                         String sanitizedTitle = title.replaceAll("[^a-zA-Z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
 
-                        log.debug("Exact match failed for '{}'. Trying fallback with sanitized query: '{}'", title, sanitizedTitle);
+                        log.warn("Exact match failed for '{}'. Trying fallback with sanitized query: '{}'", title, sanitizedTitle);
                         MovieSearchResponseDTO searchResponse = movieSearchService.searchMovies(sanitizedTitle);
-
                         // If we get results from the fallback, take the IMDB ID from the first match
                         if (searchResponse != null && searchResponse.getResults() != null && !searchResponse.getResults().isEmpty()) {
                             movie.setMovieId(searchResponse.getResults().get(0).getId());
                             movie.setPosterUrl(searchResponse.getResults().get(0).getPosterUrl());
+                        }else{
+                            //Just add it to the tasteprofile and recursively call it. It then should not be recommended anymore
+                            log.warn("Failed to find the match. Just adding it the the tasteprofile and then it isn't recommended anymore");
+                            RatedMovie failedMovie = new RatedMovie();
+                            failedMovie.setMovieId(rec.getMovie_id());
+                            failedMovie.setName(title);
+                            failedMovie.setRating(1.0f);
+                            group.getMembers().get(0).getTasteProfile().getRatedMovies().add(failedMovie);
+                            return recommendMovies(group, offset);
                         }
                     }
                 } catch (Exception e) {
                     // Log but don't crash the whole recommendation process if one movie fails
                     log.warn("Failed to fetch IMDB ID from OMDB for title: {}", title);
+
                 }
             }
 
@@ -208,5 +226,31 @@ public class GroupService {
         Group group = getGroupById(groupId);
         group.setProfilePicture(imageBytes);
         groupRepository.save(group);
+    }
+    private int calculateDistance(String s1, String s2) {
+        if (s1 == null || s2 == null) return Integer.MAX_VALUE;
+
+        // Normalize strings for better matching: lowercase and remove special chars
+        s1 = s1.toLowerCase().replaceAll("[^a-z0-9]", "");
+        s2 = s2.toLowerCase().replaceAll("[^a-z0-9]", "");
+
+        int[] costs = new int[s2.length() + 1];
+        for (int i = 0; i <= s1.length(); i++) {
+            int lastValue = i;
+            for (int j = 0; j <= s2.length(); j++) {
+                if (i == 0) {
+                    costs[j] = j;
+                } else if (j > 0) {
+                    int newValue = costs[j - 1];
+                    if (s1.charAt(i - 1) != s2.charAt(j - 1)) {
+                        newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                    }
+                    costs[j - 1] = lastValue;
+                    lastValue = newValue;
+                }
+            }
+            if (i > 0) costs[s2.length()] = lastValue;
+        }
+        return costs[s2.length()];
     }
 }
