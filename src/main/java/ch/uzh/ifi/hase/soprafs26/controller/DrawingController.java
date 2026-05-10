@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 public class DrawingController {
@@ -40,5 +45,28 @@ public class DrawingController {
         User user = userService.getUserByToken(token);
 
         return drawingService.initializeDrawingSession(groupId, user);
+    }
+    @PostMapping("/groups/{groupId}/drawing/save")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public Map<String, String> saveGroupDrawing(
+            @PathVariable Long groupId,
+            @RequestParam("sessionId") String sessionId,
+            @RequestParam("image") MultipartFile image,
+            @RequestHeader(value = "Authorization", required = true) String authorization
+    ) {
+        String token = AuthenticationController.getAuthorizationToken(authorization);
+
+        if (!userService.authenticated(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You need to be logged in to do this");
+        }
+
+        User user = userService.getUserByToken(token);
+
+        String savedImage = drawingService.saveDrawingAndCloseSession(groupId, sessionId, image, user);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("image", savedImage);
+        return response;
     }
 }
