@@ -4,6 +4,8 @@ import java.util.List;
 
 import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollDetailsGetDTO;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -117,6 +119,30 @@ public class GroupController {
         GroupDetailsResponseDTO response = DTOMapper.INSTANCE.convertEntityToGroupDetailsResponseDTO(group);
         response.setJoinUrl("/groups/join/" + group.getJoinToken());
         return response;
+    }
+
+    @GetMapping(
+            value = "/groups/{groupId}/profile-picture",
+            // TODO: this is just a placeholder at the moment: store the actual media type on upload!
+            produces = MediaType.IMAGE_PNG_VALUE
+    )
+    public ResponseEntity<byte[]> getGroupProfilePicture(
+            @PathVariable Long groupId,
+            @RequestHeader(value = "Authorization", required = true) String authorization
+    ) {
+        String token = AuthenticationController.getAuthorizationToken(authorization);
+
+        if (!userService.authenticated(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You need to be logged in to do this");
+        }
+
+        User user = userService.getUserByToken(token);
+        byte[] profilePicture = groupService.getGroupProfilePicture(groupId, user);
+
+        return ResponseEntity
+                .ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(profilePicture);
     }
 
     @PostMapping("/groups/join/{joinToken}")
