@@ -22,6 +22,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.Base64;
+import java.io.IOException;
 
 
 @Service
@@ -273,5 +276,51 @@ public class DrawingService {
         private Map<Long, ActiveDrawingUserDTO> getActiveUsers() {
             return activeUsers;
         }
+    }
+
+    public String saveDrawingAndCloseSession(Long groupId, String sessionId, MultipartFile image, User user) {
+        DrawingSession session = sessionsById.get(sessionId);
+
+        // 409 Conflict if the session doesn't exist or is already closed
+        if (session == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Drawing was already closed");
+        }
+
+        // Security check
+        Group group = groupService.getGroupById(groupId);
+        if (!groupService.isMember(group, user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group");
+        }
+
+        String base64Image;
+        try {
+            // Convert file to Base64 data URI for easy frontend consumption and database storage
+            base64Image = "data:" + image.getContentType() + ";base64," +
+                    Base64.getEncoder().encodeToString(image.getBytes());
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to process image");
+        }
+
+        // Persist to database
+        groupService.updateProfilePicture(groupId, base64Image);
+
+        // Broadcast session closure so clients can close their canvas
+        Map<String, Object> broadcast = new HashMap<>();
+        broadcast.put("type", "session");
+        broadcast.put("event", "closed");
+        try {
+            String payload = objectMapper.writeValueAsString(broadcast);
+            for (ActiveDrawingUserDTO activeUser : session.getActiveUsers().values()) {
+                appWebSocketHandler.sendToUser(activeUser.getUsername(), payload);
+            }
+        } catch (Exception ignored) {
+            // Ignore JSON stringify errors (yolo)
+        }
+
+        // Destroy the session
+        sessionsById.remove(sessionId);
+        drawingSessionsByGroupId.remove(groupId);
+
+        return base64Image;
     }
 }
