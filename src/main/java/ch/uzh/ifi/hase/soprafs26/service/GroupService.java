@@ -2,16 +2,14 @@ package ch.uzh.ifi.hase.soprafs26.service;
 
 import ch.uzh.ifi.hase.soprafs26.entity.*;
 import ch.uzh.ifi.hase.soprafs26.repository.GroupRepository;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.MovieSearchResponseDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.RecommendResponseDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.MovieDetailsResultDTO;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -208,5 +206,40 @@ public class GroupService {
         Group group = getGroupById(groupId);
         group.setProfilePicture(imageBytes);
         groupRepository.save(group);
+    }
+    public Integer calculateOverlap(Group group) {
+        if (group.getMembers() == null || group.getMembers().isEmpty()) {
+            return 0; //
+        }
+
+        // 1. Gather all TasteProfiles from members
+        List<TasteProfile> memberProfiles = group.getMembers().stream()
+                .map(User::getTasteProfile)
+                .filter(Objects::nonNull)
+                .toList();
+
+        // 2. Merge them to get a master list of all rated movies in the group
+        List<Map<String,Float>> seperateWatchedMovies = new ArrayList<Map<String,Float>>(memberProfiles.size());;
+        for (TasteProfile profile : memberProfiles) {
+            seperateWatchedMovies.add(profile.getRatedMovies().stream()
+                    .filter(m -> m.getMovieId() != null && !m.getMovieId().isEmpty())
+                    .collect(Collectors.toMap(
+                            RatedMovie::getMovieId,
+                            RatedMovie::getRating,
+                            (existing, replacement) -> existing
+                    )));
+        }
+
+
+        
+
+        //Call the Microservice
+        GroupOverlapResponseDTO recommendations = movieSearchService.GetGroupOverlap(seperateWatchedMovies);
+
+
+        // 6. Save back to the group
+        group.setOverlap(recommendations.getOverlap_score());
+        groupRepository.save(group);
+        return  recommendations.getOverlap_score();
     }
 }

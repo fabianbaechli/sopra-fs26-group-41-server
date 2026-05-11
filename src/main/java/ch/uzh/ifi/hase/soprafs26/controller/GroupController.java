@@ -2,6 +2,7 @@ package ch.uzh.ifi.hase.soprafs26.controller;
 
 import java.util.List;
 
+import ch.uzh.ifi.hase.soprafs26.rest.dto.*;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollDetailsGetDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,15 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 import ch.uzh.ifi.hase.soprafs26.entity.FetchedMovie;
 import ch.uzh.ifi.hase.soprafs26.entity.Group;
 import ch.uzh.ifi.hase.soprafs26.entity.User;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupCreatePostDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupCreateResponseDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupDetailsResponseDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupJoinResponseDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupLeaveResponseDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupRecommendationDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupSummaryDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupsGetResponseDTO;
-import ch.uzh.ifi.hase.soprafs26.rest.dto.RecommendedMovieDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.ActivePollResponseDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollResultsResponseDTO;
 import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollStartResponseDTO;
@@ -305,6 +297,51 @@ public class GroupController {
 
         User user = userService.getUserByToken(token);
         return pollService.getPollResults(groupId, user);
+    }
+
+    @GetMapping("/groups/{groupId}/overlap")
+    @ResponseStatus(HttpStatus.OK)
+    @ResponseBody
+    public GroupOverlapGetDTO getGroupOverlap(
+            @PathVariable Long groupId,
+            @RequestHeader(value = "Authorization", required = true) String authorization) { // <-- Added Header
+
+        String token = AuthenticationController.getAuthorizationToken(authorization);
+
+        if (!userService.authenticated(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You need to be logged in to do this");
+        }
+
+        User user = userService.getUserByToken(token);
+        Group group = groupService.getGroupById(groupId);
+
+        // Security check: Ensure the caller is actually in the group
+        if (!groupService.isMember(group, user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group");
+        }
+
+        // 1. Check if overlap already exist to save compute
+        Integer overlap = group.getOverlap();
+
+
+        // 2
+        if (overlap == null) {
+
+            // This throws the required 409 Conflict if no members have data I guess same applies for overlap so Ima keep this here
+            groupService.checkRecommendedMoviesEligibility(group);
+
+            // Generate the movies and save them to the group database
+            overlap = groupService.calculateOverlap(group);
+        }
+
+        // Build the response
+        GroupOverlapGetDTO response= new GroupOverlapGetDTO();
+
+        response .setOverlap(overlap);
+
+
+
+        return response;
     }
 
 

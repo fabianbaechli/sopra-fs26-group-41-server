@@ -41,6 +41,8 @@ public class Group implements Serializable {
 
     //private Poll Poll;
 
+    private Integer overlap;
+
     private String joinToken;
 
     // tells hibernate to store profile_picture as a large object
@@ -50,6 +52,8 @@ public class Group implements Serializable {
     @ManyToOne
     private User owner;
 
+
+
     public Long getId() {
         return id;
     }
@@ -57,6 +61,10 @@ public class Group implements Serializable {
     public void setId(Long id) {
         this.id = id;
     }
+
+    public Integer getOverlap() {return overlap;}
+
+    public void setOverlap(Integer overlap) {this.overlap = overlap;}
 
     public String getGroupName() {
         return groupName;

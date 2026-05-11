@@ -372,4 +372,37 @@ public class MovieSearchService {
 
         return new ArrayList<>();
     }
+    public GroupOverlapResponseDTO GetGroupOverlap(List<Map<String,Float>> MemberWatchedRatings) {
+
+
+        String url = recommendationUrl + "/group-overlap";
+        GroupOverlapRequestDTO requestPayload = new GroupOverlapRequestDTO(MemberWatchedRatings);
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            String token = getGoogleCloudToken(recommendationUrl);
+            if (token != null) {
+                headers.setBearerAuth(token); // Use the same auth logic as your other methods
+            }
+
+            HttpEntity<GroupOverlapRequestDTO> requestEntity = new HttpEntity<>(requestPayload, headers);
+
+            // Please make this work PLEASE
+            ResponseEntity<GroupOverlapResponseDTO> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    requestEntity,
+                    GroupOverlapResponseDTO.class
+            );
+
+            if (response.getBody() != null) {
+                return response.getBody();
+            }
+        } catch (Exception e) {
+
+            System.err.println("Failed to fetch recommendations: " + e.getMessage());
+        }
+
+        return new GroupOverlapResponseDTO();
+    }
 }
