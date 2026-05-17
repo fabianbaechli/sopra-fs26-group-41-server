@@ -88,8 +88,7 @@ http://localhost:8080
 ```
 
 ### Optional: Build local database
-Warning: creating the database is compute intense and will take multiple hours.
-TODO: add sql script for creating the database
+See appendix
 
 ### Start the recommendation service locally
 
