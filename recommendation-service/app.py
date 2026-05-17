@@ -4,6 +4,7 @@ import os
 import logging
 import re
 from urllib.parse import unquote
+import itertools
 
 app = Flask(__name__)
 
@@ -414,7 +415,7 @@ def calculate_user_overlap():
 
             # Calculate Edge Strength (from previous logic: bounded 0.0 to 1.0)
             avg = r_sum / count
-            edge_strength = max(0.0, min(1.0, (avg - 20.0) / 80.0))
+            edge_strength = max(0.0, min(1.0, avg / 20.0))
 
             # Factor in how highly they rated these connected movies
             r1_factor = float(user1[m1]) / max_rating
@@ -441,6 +442,120 @@ def calculate_user_overlap():
     final_percentage = min(100, max(0, final_percentage))
 
     return jsonify({"overlap_score": final_percentage})
+
+
+
+@app.route("/group-overlap", methods=["POST"])
+def calculate_group_overlap():
+    data = request.get_json()
+    # Expects a list of dictionaries: [{movie_id: rating}, {movie_id: rating}, ...]
+    all_users = data.get("MemberWatchedRatings", [])
+
+    if not all_users or len(all_users) < 2:
+        return jsonify({"overlap_score": 0})
+
+    # Dynamically find the max rating across ALL users in the group
+    max_rating = 2.0
+    for user_dict in all_users:
+        if user_dict:
+            user_max = max([float(v) for v in user_dict.values()] + [1.0])
+            if user_max > max_rating:
+                max_rating = user_max
+
+   
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    total_group_percentage = 0.0
+    pairs_count = 0
+
+    
+    
+    for user1, user2 in itertools.combinations(all_users, 2):
+        if not user1 or not user2:
+            continue
+
+        user1_ids = set(user1.keys())
+        user2_ids = set(user2.keys())
+        shared_ids = user1_ids.intersection(user2_ids)
+        union_ids = user1_ids.union(user2_ids)
+
+        total_score = 0.0
+
+        # 1. DIRECT OVERLAP (Shared Movies) 
+        for mid in shared_ids:
+            r1 = float(user1[mid])
+            r2 = float(user2[mid])
+            rating_diff = abs(r1 - r2)
+            match_score = max(0.0, 1.0 - (rating_diff / max_rating))
+            total_score += match_score
+
+        #2. INDIRECT OVERLAP (Graph Connections) 
+        u1_unique = list(user1_ids - shared_ids)
+        u2_unique = list(user2_ids - shared_ids)
+
+        if u1_unique and u2_unique:
+            p1 = ",".join(["?"] * len(u1_unique))
+            p2 = ",".join(["?"] * len(u2_unique))
+
+            query = f"""
+                SELECT movie_a, movie_b, rating_sum, count
+                FROM connections
+                WHERE (movie_a IN ({p1}) AND movie_b IN ({p2}))
+                   OR (movie_b IN ({p1}) AND movie_a IN ({p2}))
+            """
+            params = u1_unique + u2_unique + u1_unique + u2_unique
+            cursor.execute(query, params)
+            edges = cursor.fetchall()
+
+            best_indirect_matches = {}
+
+            for row in edges:
+                ma, mb, r_sum, count = str(row[0]), str(row[1]), row[2], row[3]
+
+                if ma in user1 and mb in user2: #Assign the movies to both users
+                    m1, m2 = ma, mb
+                elif mb in user1 and ma in user2:
+                    m1, m2 = mb, ma
+                else:
+                    continue
+
+                if count < 5:
+                    continue
+
+                avg = r_sum / count
+                edge_strength = max(0.0, min(1.0, (avg / 20.0)))
+
+                r1_factor = float(user1[m1]) / max_rating
+                r2_factor = float(user2[m2]) / max_rating
+
+                indirect_match_score = edge_strength * r1_factor * r2_factor
+
+                if m1 not in best_indirect_matches or indirect_match_score > best_indirect_matches[m1]:
+                    best_indirect_matches[m1] = indirect_match_score
+
+            for score in best_indirect_matches.values():
+                total_score += (score * 0.8) #is here to make indirect matches less indicative, yes its a magic number
+
+        # --- 3. PAIR PERCENTAGE ---
+        union_size = len(union_ids)
+        if union_size > 0:
+            pair_percentage = (total_score / union_size) * 100 #out of all the movies watched how many indicate shared taste?
+            total_group_percentage += pair_percentage
+        
+        pairs_count += 1
+
+    conn.close()
+
+    # --- 4. FINAL GROUP PERCENTAGE ---
+    if pairs_count == 0:
+        return jsonify({"overlap_score": 0})
+
+    # Average the scores of all pairs
+    final_group_percentage = int(round(total_group_percentage / pairs_count))
+    final_group_percentage = min(100, max(0, final_group_percentage))
+
+    return jsonify({"overlap_score": final_group_percentage})
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.DEBUG)
