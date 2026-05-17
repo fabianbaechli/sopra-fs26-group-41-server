@@ -17,11 +17,15 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.ActivePollResponseDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollResultsResponseDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.poll.PollVoteResponseDTO;
 
 @WebMvcTest(GroupController.class)
 class GroupControllerTest {
@@ -225,5 +229,107 @@ class GroupControllerTest {
                 .andExpect(status().isCreated());
 
         verify(pollService, times(1)).startPoll(10L, user);
+    }
+
+    @Test
+    void getGroupProfilePicture_validToken_returnsImageBytes() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("alice");
+
+        byte[] image = "fake-image".getBytes();
+
+        when(userService.authenticated("valid-token")).thenReturn(true);
+        when(userService.getUserByToken("valid-token")).thenReturn(user);
+        when(groupService.getGroupProfilePicture(10L, user)).thenReturn(image);
+
+        mockMvc.perform(get("/groups/10/profile-picture")
+                        .header("Authorization", "Bearer valid-token"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertArrayEquals(image, result.getResponse().getContentAsByteArray()));
+
+        verify(groupService).getGroupProfilePicture(10L, user);
+    }
+
+    @Test
+    void getActivePoll_validToken_returns200() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("alice");
+
+        ActivePollResponseDTO response = new ActivePollResponseDTO();
+        response.setGroupId(10L);
+        response.setStatus("OPEN");
+        response.setPollCompletedByUser(false);
+        response.setMovies(List.of());
+
+        when(userService.authenticated("valid-token")).thenReturn(true);
+        when(userService.getUserByToken("valid-token")).thenReturn(user);
+        when(pollService.getActivePoll(10L, user)).thenReturn(response);
+
+        mockMvc.perform(get("/groups/10/poll")
+                        .header("Authorization", "Bearer valid-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId", is(10)))
+                .andExpect(jsonPath("$.status", is("OPEN")))
+                .andExpect(jsonPath("$.pollCompletedByUser", is(false)))
+                .andExpect(jsonPath("$.movies", hasSize(0)));
+
+        verify(pollService).getActivePoll(10L, user);
+    }
+
+    @Test
+    void submitPollVote_validToken_returns200() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("alice");
+
+        PollVoteResponseDTO response = new PollVoteResponseDTO();
+        response.setUserId(1L);
+
+        when(userService.authenticated("valid-token")).thenReturn(true);
+        when(userService.getUserByToken("valid-token")).thenReturn(user);
+        when(pollService.submitVotes(eq(10L), eq(user), any())).thenReturn(response);
+
+        mockMvc.perform(post("/groups/10/vote")
+                        .header("Authorization", "Bearer valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "votes": [
+                                {
+                                  "movieId": "tt0111161",
+                                  "interested": true
+                                }
+                              ]
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId", is(1)));
+
+        verify(pollService).submitVotes(eq(10L), eq(user), any());
+    }
+
+    @Test
+    void getPollResults_validToken_returns200() throws Exception {
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("alice");
+
+        PollResultsResponseDTO response = new PollResultsResponseDTO();
+        response.setStatus("FINISHED");
+        response.setTopMovies(List.of());
+
+        when(userService.authenticated("valid-token")).thenReturn(true);
+        when(userService.getUserByToken("valid-token")).thenReturn(user);
+        when(pollService.getPollResults(10L, user)).thenReturn(response);
+
+        mockMvc.perform(get("/groups/10/results")
+                        .header("Authorization", "Bearer valid-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("FINISHED")))
+                .andExpect(jsonPath("$.topMovies", hasSize(0)));
+
+        verify(pollService).getPollResults(10L, user);
     }
 }
