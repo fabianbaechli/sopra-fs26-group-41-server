@@ -186,6 +186,10 @@ OMDB_API_KEY: "OMDB_API_KEY_PLACEHOLDER"
 
 During deployment, the workflow replaces `OMDB_API_KEY_PLACEHOLDER` with the `OMDB_API_KEY` GitHub secret and then deploys using `google-github-actions/deploy-appengine`.
 
+## Google Cloud Run
+
+The recommendation-service folder is run in a google cloud run enviroment. The cloud run has access to a bucket that contains all the .db files
+
 ## Roadmap
 
 - Make recommendation algorithm more sophisticated. Biggest issue at the moment is that the service doesn't take individual popularity preference of users into consideration. This results in users who typically like popular movies getting recommendations for niche movies and vice versa.
@@ -200,6 +204,17 @@ During deployment, the workflow replaces `OMDB_API_KEY_PLACEHOLDER` with the `OM
 - Benjamin Boksberger
 
 This project was developed for the SoPra FS26 course at the University of Zurich. Thanks to the teaching team for the Spring Boot server template and project guidance.
+
+## Apendix
+
+If you wish to build the `movies_connections.db` `movie_edges.db` and `movies_catalog.db` you need to run the python programs in the builder folder in the following order:
+1. `Json_builder.py`
+2. `Movie_connections_builder.py`
+3. `Movie_edges_builder.py`
+4. `Movie_catalog_builder.py`
+
+> [!IMPORTANT] 
+> If you do not have a lot of RAM and a fast processor we do not recommend trying to build these on your own. It will take a long time and totally occupy all of your computers Memory.
 
 ## License
 
