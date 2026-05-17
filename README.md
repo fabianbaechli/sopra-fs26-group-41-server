@@ -13,7 +13,6 @@ Backend service for a movie-night planning application. The server handles user 
 - Docker, GitHub Actions, Google App Engine Flex, and Google Cloud Run for deployment
 
 ## High-level components
-
 ### 1. Authentication and users
 
 [`RegistrationController`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller/RegistrationController.java), [`AuthenticationController`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller/AuthenticationController.java), [`UsersController`](src/main/java/ch/uzh/ifi/hase/soprafs26/controller/UsersController.java), [`UserService`](src/main/java/ch/uzh/ifi/hase/soprafs26/service/UserService.java), and [`PasswordService`](src/main/java/ch/uzh/ifi/hase/soprafs26/service/PasswordService.java) implement registration, login, logout, token validation, password hashing, and user-profile retrieval. Authenticated requests use a bearer token in the `Authorization` header. Passwords are hashed using `BCrypt`.
