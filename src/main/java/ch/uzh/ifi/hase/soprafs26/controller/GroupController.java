@@ -29,6 +29,7 @@ import ch.uzh.ifi.hase.soprafs26.rest.mapper.DTOMapper;
 import ch.uzh.ifi.hase.soprafs26.service.GroupService;
 import ch.uzh.ifi.hase.soprafs26.service.UserService;
 import ch.uzh.ifi.hase.soprafs26.service.PollService;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 public class GroupController {
@@ -152,7 +153,13 @@ public class GroupController {
         User user = userService.getUserByToken(token);
 
         Group joinedGroup = groupService.joinGroupByToken(joinToken, user);
-        groupService.recommendMovies(joinedGroup,0); //Offset is at zero when creating a group
+        CompletableFuture.runAsync(() -> {
+            try {
+                groupService.recommendMovies(joinedGroup, 0);
+            } catch (Exception e) {
+                System.err.println("Background movie recommendation failed: " + e.getMessage());
+            }
+        });
 
         GroupJoinResponseDTO response = new GroupJoinResponseDTO();
         response.setGroupUrl("/groups/" + joinedGroup.getId());
