@@ -12,6 +12,21 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import ch.uzh.ifi.hase.soprafs26.entity.User;
+import ch.uzh.ifi.hase.soprafs26.entity.TasteProfile;
+import ch.uzh.ifi.hase.soprafs26.entity.RatedMovie;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.OverlapResponseDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.RecommendResponseDTO;
+import ch.uzh.ifi.hase.soprafs26.rest.dto.GroupOverlapResponseDTO;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.mockito.ArgumentMatchers;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import java.net.URI;
 import java.util.List;
@@ -116,5 +131,143 @@ public class MovieSearchServiceTest {
     public void fetchInternalMovieIds_nullOrEmptyList_returnsEmptyMap() {
         assertTrue(movieSearchService.fetchInternalMovieIds(null).isEmpty());
         assertTrue(movieSearchService.fetchInternalMovieIds(List.of()).isEmpty());
+    }
+    @Test
+    public void searchMovies_falseResponse_returnsEmptyList() {
+        OmdbSearchResponseDTO mockResponse = new OmdbSearchResponseDTO();
+        mockResponse.setResponse("False");
+
+        Mockito.when(restTemplate.getForObject(Mockito.any(URI.class), Mockito.eq(OmdbSearchResponseDTO.class)))
+                .thenReturn(mockResponse);
+
+        MovieSearchResponseDTO result = movieSearchService.searchMovies("UnknownMovie123");
+
+        assertNotNull(result);
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    public void searchMovies_parsesYearAndHandlesNA() {
+        OmdbSearchResponseDTO mockResponse = new OmdbSearchResponseDTO();
+        mockResponse.setResponse("True");
+
+        OmdbSearchItemDTO item = new OmdbSearchItemDTO();
+        item.setImdbID("tt456");
+        item.setTitle("Test Movie");
+        item.setYear("2020–2021"); // Testing the split logic
+        item.setPoster("N/A"); // Testing the N/A logic
+        mockResponse.setSearch(List.of(item));
+
+        Mockito.when(restTemplate.getForObject(Mockito.any(URI.class), Mockito.eq(OmdbSearchResponseDTO.class)))
+                .thenReturn(mockResponse);
+
+        MovieSearchResponseDTO result = movieSearchService.searchMovies("Test Movie");
+
+        assertEquals(2020, result.getResults().get(0).getYear());
+        assertNull(result.getResults().get(0).getPosterUrl());
+    }
+
+    @Test
+    public void getUserTasteOverlap_nullUsersOrProfiles_returnsZero() {
+        User user1 = new User();
+        User user2 = new User();
+        // Taste profiles are null
+        assertEquals(0, movieSearchService.getUserTasteOverlap(user1, user2));
+        assertEquals(0, movieSearchService.getUserTasteOverlap(null, user2));
+    }
+
+    @Test
+    public void getUserTasteOverlap_success() {
+        User user1 = new User();
+        TasteProfile tp1 = new TasteProfile();
+        RatedMovie rm1 = new RatedMovie();
+        rm1.setMovieId("101");
+        rm1.setRating(8.0f);
+        tp1.setRatedMovies(List.of(rm1));
+        user1.setTasteProfile(tp1);
+
+        User user2 = new User();
+        TasteProfile tp2 = new TasteProfile();
+        RatedMovie rm2 = new RatedMovie();
+        rm2.setMovieId("101");
+        rm2.setRating(7.0f);
+        tp2.setRatedMovies(List.of(rm2));
+        user2.setTasteProfile(tp2);
+
+        Map<String, Object> mockBody = new HashMap<>();
+        mockBody.put("overlap_score", 85);
+        ResponseEntity<Map> mockResponseEntity = new ResponseEntity<>(mockBody, HttpStatus.OK);
+
+        Mockito.when(restTemplate.exchange(
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(HttpEntity.class),
+                ArgumentMatchers.eq(Map.class)
+        )).thenReturn(mockResponseEntity);
+
+        Integer overlap = movieSearchService.getUserTasteOverlap(user1, user2);
+        assertEquals(85, overlap);
+    }
+
+    @Test
+    public void fetchRecommendations_success() {
+        Map<String, Float> ratings = new HashMap<>();
+        ratings.put("101", 9.0f);
+
+        RecommendResponseDTO rec1 = new RecommendResponseDTO();
+        // Set basic fields if your DTO has them, e.g., rec1.setMovieId("102");
+        RecommendResponseDTO[] mockResponseArray = { rec1 };
+        ResponseEntity<RecommendResponseDTO[]> mockResponseEntity = new ResponseEntity<>(mockResponseArray, HttpStatus.OK);
+
+        Mockito.when(restTemplate.exchange(
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(HttpEntity.class),
+                ArgumentMatchers.eq(RecommendResponseDTO[].class)
+        )).thenReturn(mockResponseEntity);
+
+        List<RecommendResponseDTO> results = movieSearchService.fetchRecommendations(ratings, 10, 0);
+
+        assertNotNull(results);
+        assertEquals(1, results.size());
+    }
+
+    @Test
+    public void getGroupOverlap_success() {
+        List<Map<String, Float>> memberRatings = new ArrayList<>();
+        Map<String, Float> ratings = new HashMap<>();
+        ratings.put("101", 8.0f);
+        memberRatings.add(ratings);
+
+        GroupOverlapResponseDTO mockDto = new GroupOverlapResponseDTO();
+        // Assuming your DTO has a setter for overlap or similar
+
+        ResponseEntity<GroupOverlapResponseDTO> mockResponseEntity = new ResponseEntity<>(mockDto, HttpStatus.OK);
+
+        Mockito.when(restTemplate.exchange(
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(HttpEntity.class),
+                ArgumentMatchers.eq(GroupOverlapResponseDTO.class)
+        )).thenReturn(mockResponseEntity);
+
+        GroupOverlapResponseDTO result = movieSearchService.GetGroupOverlap(memberRatings);
+        assertNotNull(result);
+    }
+
+    @Test
+    public void getGroupOverlap_exceptionCaught_returnsEmptyObject() {
+        List<Map<String, Float>> memberRatings = new ArrayList<>();
+
+        Mockito.when(restTemplate.exchange(
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(HttpEntity.class),
+                ArgumentMatchers.eq(GroupOverlapResponseDTO.class)
+        )).thenThrow(new RuntimeException("Simulated Network Error"));
+
+        GroupOverlapResponseDTO result = movieSearchService.GetGroupOverlap(memberRatings);
+
+        assertNotNull(result); // Should return a new empty DTO instead of crashing
     }
 }
