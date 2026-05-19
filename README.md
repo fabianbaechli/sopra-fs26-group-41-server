@@ -230,7 +230,7 @@ The recommendation-service folder is run in a google cloud run enviroment. The c
 
 This project was developed for the SoPra FS26 course at the University of Zurich. Thanks to the teaching team for the Spring Boot server template and project guidance.
 
-## Apendix
+## Appendix
 
 If you wish to build the `movies_connections.db` `movie_edges.db` and `movies_catalog.db` you need to run the python programs in the builder folder in the following order:
 1. `Json_builder.py`
