@@ -1,3 +1,29 @@
+<div align="center">
+  <img src="public/logo.png" alt="Movieblendr logo" width="140" />
+  <h1>Movieblendr.</h1>
+  <p><strong>Find the movie your whole group actually wants to watch.</strong></p>
+  <p>
+    <a href="https://github.com/fabianbaechli/sopra-fs26-group-41-client">Client</a> ·
+    <a href="https://github.com/fabianbaechli/sopra-fs26-group-41-server">Server</a>
+  </p>
+  <p>
+    <a href="https://github.com/fly-die"><img src="https://wsrv.nl/?url=https://github.com/fly-die.png&mask=circle&w=60&h=60" width="60" alt="fly-die" /></a>
+    <a href="https://github.com/fabianbaechli"><img src="https://wsrv.nl/?url=https://github.com/fabianbaechli.png&mask=circle&w=60&h=60" width="60" alt="fabianbaechli" /></a>
+    <a href="https://github.com/BB8006"><img src="https://wsrv.nl/?url=https://github.com/BB8006.png&mask=circle&w=60&h=60" width="60" alt="BB8006" /></a>
+    <a href="https://github.com/EmritoHeltar"><img src="https://wsrv.nl/?url=https://github.com/EmritoHeltar.png&mask=circle&w=60&h=60" width="60" alt="EmritoHeltar" /></a>
+  </p>
+</div>
+
+---
+
+## What is this?
+
+Picking a movie with a group is painful. Everyone has different taste, nobody commits, and you end up rewatching something you've all seen. Movieblendr fixes that.
+
+Each member connects their [Letterboxd](https://letterboxd.com) history to build a personal taste profile. The app runs a recommendation algorithm across the whole group, surfaces movies everyone is likely to enjoy, and lets the group vote on a shortlist together in real time. No more endless discussions!
+
+---
+
 # Movieblendr. Backend
 
 Backend service for a movie-night planning application. The server handles user accounts, authentication, Letterboxd data import, movie search, taste-overlap calculations, group management, group recommendations, polls, and collaborative drawing sessions. It exposes a Spring Boot REST API and WebSocket endpoint used by the client application, and it delegates recommendation-calculations to a small Python recommendation service.
